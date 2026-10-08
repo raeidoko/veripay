@@ -15,6 +15,7 @@ VeriPay is a polished escrow workflow platform for Nigerian social commerce. It 
 - [Implementation log](docs/IMPLEMENTATION_LOG.md)
 - [Backend and login setup](docs/BACKEND_AND_LOGIN_SETUP.md)
 - [Frontend and backend system architecture](docs/SYSTEM_ARCHITECTURE_FRONTEND_BACKEND.md)
+- [Frontend and backend system architecture DOCX](docs/VeriPay_Frontend_Backend_System_Architecture.docx)
 
 ## Run locally
 
