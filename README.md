@@ -10,6 +10,10 @@ VeriPay is a polished escrow workflow platform for Nigerian social commerce. It 
 - Dispute center with evidence, mediated discussion, and arbitration decisions
 - Digital receipt modal with print support
 
+## Project documentation
+
+- [Implementation log](docs/IMPLEMENTATION_LOG.md)
+
 ## Run locally
 
 Prerequisites: Node.js 20 or newer.
