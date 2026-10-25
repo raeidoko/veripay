@@ -6,6 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local project backups (may contain development data)
+backups/
+.npm-cache/
+tmp/
 data/*.json
-__pycache__/
-*.pyc
+data/uploads/
+data/governance/
+data/**/*.sqlite*

@@ -1,6 +1,6 @@
 {
-  "name": "VeriPay",
-  "description": "A secure escrow payment solution for informal digital trade, protecting both buyers and sellers with transaction agreements, active tracking, and structured dispute resolution.",
+  "name": "VeriPay - AI-Powered E-Commerce & Escrow Platform",
+  "description": "Next-generation secure transaction platform featuring AI purchase confirmation & automatic evidence, human-supervised disputes, risk scoring & identity links, Trust Passport 2.0, and dispatch verification.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

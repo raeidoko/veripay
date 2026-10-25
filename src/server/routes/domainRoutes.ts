@@ -1,0 +1,16 @@
+import express from 'express';
+import {auditLogService} from '../services/auditLogService.ts';
+import { catalogRoutes } from './catalogRoutes.ts';
+import { orderRoutes } from './orderRoutes.ts';
+import { disputeRoutes } from './disputeRoutes.ts';
+import { riskRoutes } from './riskRoutes.ts';
+import { trustRoutes } from './trustRoutes.ts';
+import { walletRoutes } from './walletRoutes.ts';
+export const domainRoutes = express.Router();
+domainRoutes.use(catalogRoutes);
+domainRoutes.use(orderRoutes);
+domainRoutes.use(disputeRoutes);
+domainRoutes.use(riskRoutes);
+domainRoutes.use(trustRoutes);
+domainRoutes.use(walletRoutes);
+domainRoutes.get('/audit-logs', (_req,res) => res.json(auditLogService.getLogs()));
