@@ -47,12 +47,8 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
   const [submittingResponse, setSubmittingResponse] = useState(false);
 
   // Reviewer Consequential Decision state
-  const [selectedDecision, setSelectedDecision] = useState<'BUYER_REFUNDED' | 'SELLER_PAID' | 'SPLIT'>(
-    dispute.aiRecommendation?.recommendedOutcome || 'BUYER_REFUNDED'
-  );
-  const [decisionRationale, setDecisionRationale] = useState(
-    dispute.aiRecommendation ? `Approved based on AI analysis: ${dispute.aiRecommendation.rationale}` : ''
-  );
+  const [selectedDecision, setSelectedDecision] = useState<'BUYER_REFUNDED' | 'SELLER_PAID' | 'SPLIT' | null>(null);
+  const [decisionRationale, setDecisionRationale] = useState('');
   const [deciding, setDeciding] = useState(false);
 
   const handleUploadEvidence = async (e: React.FormEvent) => {
@@ -100,7 +96,7 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
   };
 
   const handleConsequentialDecision = async () => {
-    if (!decisionRationale.trim()) {
+    if (!selectedDecision || !decisionRationale.trim()) {
       alert('Reviewer decision rationale is mandatory for consequential outcomes.');
       return;
     }
@@ -221,10 +217,10 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  AI Dispute Intelligence Analysis
+                  Dispute Advisory Analysis
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Model: {dispute.aiRecommendation.modelVersion} · Advisory Only (Human Decides)
+                  Source: {dispute.aiRecommendation.source === 'rules' ? 'Built-in rules' : dispute.aiRecommendation.modelVersion} · Advisory Only (Human Decides)
                 </p>
               </div>
             </div>
@@ -232,7 +228,7 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-600">Recommended:</span>
               <span className="px-2.5 py-1 text-xs font-bold rounded-md bg-brand-600 text-white">
-                {dispute.aiRecommendation.recommendedOutcome.replace('_', ' ')}
+                {dispute.aiRecommendation.recommendedOutcome.replaceAll('_', ' ')}
               </span>
               <span className="text-xs font-semibold text-slate-700 bg-white px-2 py-1 rounded-md border border-brand-200 tabular-nums">
                 {Math.round(dispute.aiRecommendation.confidence * 100)}% Confidence
@@ -269,8 +265,18 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
             </ul>
           </div>
 
+          {!!dispute.aiRecommendation.infoRequests?.length && (
+            <div className="text-xs text-slate-700 space-y-1">
+              <strong>Suggested questions for the reviewer:</strong>
+              <ul className="list-disc list-inside">
+                {dispute.aiRecommendation.infoRequests.map((request, i) => (
+                  <li key={i}>{request.requestedFrom}: {request.question}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="text-xs text-slate-600 pt-2 border-t border-brand-100">
-            <strong>AI Rationale:</strong> {dispute.aiRecommendation.rationale}
+            <strong>Rationale:</strong> {dispute.aiRecommendation.rationale}
           </div>
         </div>
       )}
@@ -543,7 +549,7 @@ export const DisputeDetailView: React.FC<DisputeDetailViewProps> = ({
 
                   <button
                     onClick={handleConsequentialDecision}
-                    disabled={deciding}
+                    disabled={deciding || !selectedDecision || !decisionRationale.trim()}
                     className="w-full py-2.5 text-xs font-bold text-slate-900 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 rounded-md transition-colors"
                   >
                     {deciding ? 'Executing Decision...' : 'Approve & Release Escrow Funds'}

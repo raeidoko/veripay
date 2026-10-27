@@ -192,7 +192,9 @@ export interface AIRecommendation {
   modelVersion: string;
   findings: string[];
   inconsistencies: string[];
-  recommendedOutcome: DisputeOutcome;
+  recommendedOutcome: DisputeOutcome | 'NEEDS_REVIEW';
+  source?: 'ai' | 'rules';
+  infoRequests?: { requestedFrom: 'BUYER' | 'SELLER'; question: string }[];
   confidence: number; // 0 to 1
   rationale: string;
   suggestedSplit?: { buyerPercentage: number; sellerPercentage: number };

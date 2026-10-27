@@ -102,9 +102,9 @@ checks. Existing frontend routes and response formats remain available.
 
 Buyer and seller dispute responses omit the private AI recommendation. Decisions
 remain human actions. Automated calls/SMS are not configured; delivery verification
-accepts recorded reviewer phone calls. Gemini is optional, with a request timeout
-and rule-based fallbacks. Set `GEMINI_API_KEY` and optionally `GEMINI_MODEL` to use
-the model available to your account.
+accepts recorded reviewer phone calls. The AI layer uses Dots3 via OpenRouter when
+a server key is configured, otherwise built-in rules. It supports a 20-second timeout,
+validated responses and rule fallbacks; see [AI layer setup](AI_LAYER.md).
 
 ## Verification and backups
 

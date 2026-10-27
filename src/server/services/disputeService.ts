@@ -121,12 +121,15 @@ export const disputeService = {
     const snapshot = purchaseSnapshots.find((s) => s.orderId === dispute.orderId);
     const relatedDvers = deliveryVerifications.filter((dv) => dv.orderId === dispute.orderId);
 
-    const aiResult = await aiLayer.analyzeDisputeCase(dispute, snapshot, relatedDvers, dispute.evidence);
+    const order = orders.find(o => o.id === dispute.orderId);
+    const aiResult = await aiLayer.analyzeDisputeCase(dispute, snapshot, relatedDvers, dispute.evidence, order);
 
     const rec: AIRecommendation = {
       id: `ai_rec_${Date.now()}`,
       disputeId,
-      modelVersion: process.env.GEMINI_API_KEY ? (process.env.GEMINI_MODEL || 'gemini-3.8-flash') : 'veripay-rules-v1',
+      modelVersion: aiResult.modelVersion,
+      source: aiResult.source,
+      infoRequests: aiResult.infoRequests,
       findings: aiResult.findings,
       inconsistencies: aiResult.inconsistencies,
       recommendedOutcome: aiResult.recommendedOutcome,

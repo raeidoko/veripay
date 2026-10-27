@@ -31,7 +31,7 @@ before(async () => {
   await mkdir(tempRoot, { recursive: true });
   uploadTestDirectory = await mkdtemp(path.join(tempRoot, 'test-product-uploads-'));
   server = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
-    cwd: process.cwd(), env: { ...process.env, PORT: String(port), NODE_ENV: 'production', GEMINI_API_KEY: '', VERIPAY_UPLOAD_DIR: uploadTestDirectory, VERIPAY_ADMIN_DATA_DIR: path.join(uploadTestDirectory,'governance'), VERIPAY_DEMO_PASSWORD: testPassword },
+    cwd: process.cwd(), env: { ...process.env, PORT: String(port), NODE_ENV: 'production', AI_PROVIDER: 'rules', VERIPAY_UPLOAD_DIR: uploadTestDirectory, VERIPAY_ADMIN_DATA_DIR: path.join(uploadTestDirectory,'governance'), VERIPAY_DEMO_PASSWORD: testPassword },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   await new Promise<void>((resolve, reject) => {
@@ -395,7 +395,7 @@ test('approval decisions, documents, settings and created listings survive a fre
 });
 
 test('development file serving cannot bypass private document and governance authorization', async () => {
-  const dev=spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19372',NODE_ENV:'development',GEMINI_API_KEY:'',VERIPAY_DEMO_PASSWORD:testPassword,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},stdio:['ignore','pipe','pipe'],windowsHide:true});
+  const dev=spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19372',NODE_ENV:'development',AI_PROVIDER:'rules',VERIPAY_DEMO_PASSWORD:testPassword,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},stdio:['ignore','pipe','pipe'],windowsHide:true});
   try {
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Dev server did not start')),30000);let output='';dev.stdout!.on('data',chunk=>{output+=chunk;if(output.includes('Server running on port')){clearTimeout(timer);resolve();}});dev.once('error',error=>{clearTimeout(timer);reject(error);});dev.once('exit',code=>{clearTimeout(timer);reject(new Error('Dev server exited '+code));});});
     const statePath=path.join(uploadTestDirectory,'governance','state.json');

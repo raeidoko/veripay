@@ -19,9 +19,11 @@ npm run dev
 Open http://localhost:3001. The web app and API share the same server.
 Set PORT to use a different port.
 
-Gemini features are optional. Copy .env.example to .env, and set
-GEMINI_API_KEY to enable model-backed responses. Without a key, the app uses
-the supplied fallback responses. Keep the key on the server.
+The AI layer uses Dots3-Note Preview through OpenRouter when a server-side
+`OPENROUTER_API_KEY` is configured. Missing keys, failed requests and invalid output
+use built-in rules. Purchase confirmations use exact order facts; dispute advice
+still requires human review. See [AI layer setup](docs/AI_LAYER.md) for configuration.
+No local model download or Docker service is required.
 
 ## Verify and serve a build
 

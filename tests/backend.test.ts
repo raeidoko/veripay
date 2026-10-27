@@ -30,7 +30,7 @@ async function login() {
   }
 }
 async function start(sandbox = 'true', filename = dbPath()) {
-  server = spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19373',NODE_ENV:'production',GEMINI_API_KEY:'',VERIPAY_SANDBOX_PAYMENTS:sandbox,VERIPAY_DB_PATH:filename,VERIPAY_ADMIN_DATA_DIR:path.join(directory,'governance'),VERIPAY_UPLOAD_DIR:path.join(directory,'uploads'),VERIPAY_DEMO_PASSWORD:password},windowsHide:true,stdio:['ignore','pipe','pipe']});
+  server = spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19373',NODE_ENV:'production',AI_PROVIDER:'rules',VERIPAY_SANDBOX_PAYMENTS:sandbox,VERIPAY_DB_PATH:filename,VERIPAY_ADMIN_DATA_DIR:path.join(directory,'governance'),VERIPAY_UPLOAD_DIR:path.join(directory,'uploads'),VERIPAY_DEMO_PASSWORD:password},windowsHide:true,stdio:['ignore','pipe','pipe']});
   await new Promise<void>((resolve,reject) => {
     let output = '';
     const timeout = setTimeout(() => reject(new Error('Backend did not start: '+output)),30000);
