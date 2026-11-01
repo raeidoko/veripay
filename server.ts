@@ -16,6 +16,7 @@ import { governanceDirectory } from './src/server/services/platformService.ts';
 import { sandboxPayments, walletService } from './src/server/services/walletService.ts';
 import { asyncRoute } from './src/server/routes/routeUtils.ts';
 import { serverPort } from './src/server/config.ts';
+import { requestOriginGuard } from './src/server/requestOrigin.ts';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,15 +36,7 @@ async function startServer() {
     catch { res.status(503).json({ok:false,error:'Database is unavailable'}); }
   });
   app.use('/api', persistenceMiddleware);
-  app.use('/api', (req, res, next) => {
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-      const origin = req.get('Origin');
-      if (req.get('Sec-Fetch-Site') === 'cross-site' || (origin && origin !== `${req.protocol}://${req.get('Host')}`)) {
-        return res.status(403).json({ error: 'Cross-site requests are not allowed' });
-      }
-    }
-    next();
-  });
+  app.use('/api', requestOriginGuard(process.env.VERIPAY_PUBLIC_ORIGIN));
   app.get('/api/auth/demo-accounts', (_req, res) => { res.set('Cache-Control', 'no-store').json(authService.demoAccounts()); });
   app.post('/api/auth/login', (req, res) => { res.set('Cache-Control', 'no-store'); authService.login(req, res); });
   app.post('/api/auth/register', (req, res) => { res.set('Cache-Control','no-store'); authService.register(req,res); });

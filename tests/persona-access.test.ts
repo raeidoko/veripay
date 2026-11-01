@@ -4,7 +4,6 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { workspaces } from '../src/shared/workspaces.ts';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { users as seededUsers } from '../src/server/db/store.ts';
 const cookies = new Map<string, string>();
 const testPassword = 'VeriPayTest123!';
 
@@ -44,6 +43,14 @@ before(async () => {
     server.once('error', error => { clearTimeout(timeout); reject(error); });
     server.once('exit', code => { clearTimeout(timeout); reject(new Error(`Test server exited: ${code}`)); });
   });
+  // Read fixtures from the isolated test server, never the developer's database.
+  const adminLogin = await fetch(base + '/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'tunde.risk@veripay.ng', password: testPassword }),
+  });
+  assert.equal(adminLogin.status, 200);
+  cookies.set('user_admin_1', adminLogin.headers.get('set-cookie')!.split(';')[0]);
+  const seededUsers = (await request('/users', 'user_admin_1')).data;
   for (const user of seededUsers) {
     const response = await fetch(base + '/auth/login', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email:user.email,password:testPassword}),
