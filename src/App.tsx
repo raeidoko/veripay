@@ -37,6 +37,7 @@ import { AdminControlView } from './components/AdminControlView.tsx';
 import { VerificationView } from './components/VerificationView.tsx';
 import { WalletPanel } from './components/WalletPanel.tsx';
 import { GettingStartedView } from './components/GettingStartedView.tsx';
+import { LandingPage } from './components/LandingPage.tsx';
 
 export default function App() {
   // Navigation tabs
@@ -361,7 +362,8 @@ export default function App() {
   };
 
   if (!authChecked) return <div role="status" className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-500">Checking your session…</div>;
-  if (window.location.pathname === '/getting-started' || showGettingStarted || (!currentUser && window.location.pathname === '/')) return <GettingStartedView role={currentUser?.role} onContinue={currentUser ? () => { if (window.location.pathname === '/getting-started') window.location.assign('/'); else setShowGettingStarted(false); } : undefined} />;
+  if (!currentUser && window.location.pathname === '/') return <LandingPage />;
+  if (window.location.pathname === '/getting-started' || showGettingStarted) return <GettingStartedView role={currentUser?.role} onContinue={currentUser ? () => { if (window.location.pathname === '/getting-started') window.location.assign('/'); else setShowGettingStarted(false); } : undefined} />;
   if (window.location.pathname === '/forgot-password' || !currentUser) return <SignInPanel onSignedIn={acceptSignedInUser} message={authMessage} />;
 
   return (
