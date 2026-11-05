@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import type { UserRole } from '../shared/types.ts';
 import { BrandLogo } from './BrandLogo.tsx';
 
@@ -18,6 +19,7 @@ const guides = {
 export function GettingStartedView({ role, onContinue }: { role?: UserRole; onContinue?: () => void }) {
   const [audience, setAudience] = useState<'buyer' | 'seller'>(role === 'seller' ? 'seller' : 'buyer');
   return <main className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12"><div className="mx-auto max-w-3xl space-y-6">
+    <a href="/" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-3 text-sm font-bold text-brand-800 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"><ArrowLeft size={18} aria-hidden="true" />Back to home</a>
     <header className="space-y-4"><BrandLogo size="signin" /><p className="text-sm font-bold text-brand-700">Getting started with VeriPay</p><h1 className="text-3xl font-bold tracking-tight text-slate-900">Shop, sell and follow every step.</h1><p className="text-base leading-relaxed text-slate-600">VeriPay records your purchase agreement and tracks payment and delivery. Escrow holds the payment while the order is fulfilled, and reviewers help resolve disputes.</p>
       <div role="group" aria-label="Choose a getting started guide" className="flex gap-3">{(['buyer', 'seller'] as const).map(item => <button key={item} type="button" aria-pressed={audience === item} onClick={() => setAudience(item)} className={`rounded-xl px-5 py-3 text-sm font-bold ${audience === item ? 'bg-brand-700 text-white' : 'border border-slate-300 bg-white text-slate-800'}`}>For {item}s</button>)}</div>
     </header>
