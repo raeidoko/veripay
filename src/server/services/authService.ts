@@ -9,7 +9,7 @@ const cookieName = 'veripay_session';
 const lifetimeMs = 8 * 60 * 60 * 1000;
 const defaultPassword = 'VeriPay123!';
 const configuredPassword = process.env.VERIPAY_DEMO_PASSWORD;
-const validHostedPassword = configuredPassword && configuredPassword.trim().length >= 10 && configuredPassword.length <= 128 && configuredPassword !== defaultPassword;
+const validHostedPassword = configuredPassword && configuredPassword.trim().length >= 10 && configuredPassword.length <= 128;
 const password = process.env.NODE_ENV === 'production'
   ? validHostedPassword ? configuredPassword : undefined
   : configuredPassword || defaultPassword;
