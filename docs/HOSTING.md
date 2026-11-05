@@ -9,8 +9,10 @@ from `dist/` at the same origin as `/api`.
 1. Deploy the intended GitHub branch to the existing `veripay-api` service.
 2. Use Node.js 24. Build with `npm ci --include=dev && npm run build` and start
    with `npm start`. Check `/api/health` after deployment.
-3. Retain the API's configured database and upload paths. Keep persistent files
-   on a mounted disk if using SQLite. Use one API instance for this setup.
+3. Set the server's `DATABASE_URL` to its Supabase/PostgreSQL connection URL.
+   The server uses it for accounts, orders, credentials and uploaded files.
+   `/api/health` should report `storage.engine: postgres`. Without that URL,
+   the app uses local SQLite, which requires a persistent disk on Render.
 4. Set `VERIPAY_DEMO_PASSWORD` to a private password of 10–128 characters to
    enable seeded sign-in. The seeded admin email is `tunde.risk@veripay.ng`.
 5. Set `AI_PROVIDER=rules` for the built-in responses. To use a hosted model,
@@ -21,7 +23,7 @@ any service's compute plan or storage allocation.
 
 ## Demo retest
 
-1. Check `/api/health` for healthy SQLite storage and sandbox payments. Verify
+1. Check `/api/health` for healthy PostgreSQL storage and sandbox payments. Verify
    the configured storage path and variable names in Render without exposing values.
 2. Open Demo accounts on the sign-in page or check `/api/auth/demo-accounts`.
    Confirm `enabled: true` and sign in as buyer, seller, and reviewer (admin).
@@ -34,14 +36,18 @@ any service's compute plan or storage allocation.
 
 ## Persistence and restarts
 
-SQLite, verification documents and product images live under the persistent
-`/var/data/veripay` mount. Use one service instance because the app uses SQLite
-and in-memory sessions. Deployments and restarts require users to sign in again.
-New deployments start with seeded data unless an existing database is restored;
-local accounts and uploads are not automatically copied to the hosted service.
+With `DATABASE_URL`, domain records and password hashes live in PostgreSQL.
+Private documents and product images are stored in its `file_blobs` repository.
+The backend uses database transactions and immutable audit, purchase and ledger
+seals. Row-level security blocks direct browser access. Sessions remain in
+memory, so a deployment may require signing in again with the existing password.
 
-For backups, use `npm run db:backup` in the service shell and download the result
-to separate storage; also back up uploaded files and verification documents.
+For an existing SQLite deployment, migrate its data before switching storage.
+Files already lost with an ephemeral Render instance cannot be recovered by
+enabling PostgreSQL. Local SQLite accounts are not copied automatically.
+
+For PostgreSQL, use your database provider's backups or `pg_dump`. The existing
+`npm run db:backup` command operates on local SQLite only.
 
 ## Request origins
 

@@ -59,7 +59,7 @@ export default function App() {
     invalidateSessionRequests();
     personaIdRef.current = user.id;
     setCurrentUser(user);
-    setActiveTab(user.accountStatus === 'PENDING' ? 'verification' : workspaces[user.role].home);
+    setActiveTab(workspaces[user.role].home);
     setAuthMessage('');
   };
 
@@ -380,11 +380,11 @@ export default function App() {
           </div>
 
           {/* Zone 2: 4-5 Concise Navigation Links (single-line whitespace-nowrap) */}
-          <nav aria-label="Workspace navigation" className="hidden lg:flex items-center gap-5 text-sm font-medium text-slate-600">
+          <nav aria-label="Workspace navigation" className="hidden lg:flex items-center gap-3 text-base font-bold text-slate-800">
             {currentUser && workspace.tabs.map(item => (
               <button key={item.id} type="button" aria-current={activeTab === item.id ? 'page' : undefined}
                 onClick={() => { setSelectedDispute(null); setActiveTab(item.id); }}
-                className={`whitespace-nowrap hover:text-brand-600 ${activeTab === item.id ? 'text-brand-600 font-semibold' : ''}`}>
+                className={`rounded-lg px-3 py-2 whitespace-nowrap hover:bg-brand-50 hover:text-brand-700 ${activeTab === item.id ? 'bg-brand-100 text-brand-800 ring-1 ring-brand-300' : ''}`}>
                 {item.label}{item.id === 'orders' ? ' (' + orders.length + ')' : ''}
               </button>
             ))}
@@ -427,10 +427,10 @@ export default function App() {
             </div>
           </div>
         </div>
-        {currentUser && <nav aria-label="Mobile workspace navigation" className="lg:hidden flex overflow-x-auto gap-4 px-4 py-3 border-t border-slate-100 text-xs font-semibold">
+        {currentUser && <nav aria-label="Mobile workspace navigation" className="lg:hidden grid grid-cols-2 sm:flex sm:flex-wrap gap-2 px-4 py-3 border-t border-slate-100 text-sm font-bold">
           {workspace.tabs.map(item => <button key={item.id} type="button" aria-current={activeTab === item.id ? 'page' : undefined}
             onClick={() => { setSelectedDispute(null); setActiveTab(item.id); }}
-            className={`whitespace-nowrap ${activeTab === item.id ? 'text-brand-600' : 'text-slate-600'}`}>{item.label}</button>)}
+            className={`min-h-11 rounded-lg px-4 py-2 whitespace-nowrap ${activeTab === item.id ? 'bg-brand-100 text-brand-800 ring-1 ring-brand-300' : 'bg-slate-100 text-slate-800'}`}>{item.label}</button>)}
         </nav>}
       </header>
 
@@ -438,9 +438,9 @@ export default function App() {
       <main key={currentUser?.id} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {platform.announcement && <p className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">{platform.announcement}</p>}
         {platform.purchasesPaused && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-800">New purchases are temporarily paused. Existing orders and support remain available.</p>}
-        {currentUser.role !== 'admin' && currentUser.accountStatus !== 'APPROVED' && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">Your account is awaiting admin approval. <button className="font-bold underline" onClick={()=>setActiveTab('verification')}>Submit verification documents</button> to activate trading.</div>}
+        {currentUser.role !== 'admin' && currentUser.accountStatus !== 'APPROVED' && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2"><p className="font-bold">{currentUser.accountStatus === 'PENDING' ? 'Your account review is in progress' : 'Your account needs attention'}</p><p>{currentUser.role === 'buyer' ? 'You can browse the shop, ask the shopping assistant, and view your purchases and disputes during review.' : 'You can view your storefront, sales and disputes during review.'} Trading requires approval.</p><div className="flex flex-wrap gap-3"><button className="font-bold underline" onClick={()=>setActiveTab('orders')}>View {currentUser.role === 'buyer' ? 'My Purchases' : 'Sales & Dispatch'}</button><button className="font-bold underline" onClick={()=>setActiveTab('disputes')}>View My Disputes</button><button className="font-bold underline" onClick={()=>setActiveTab('verification')}>View verification status</button></div></div>}
         {activeTab === 'admin' && canView('admin') && <AdminControlView currentUser={currentUser} onChanged={loadPlatform} />}
-        {activeTab === 'verification' && canView('verification') && <VerificationView onUserUpdated={setCurrentUser} />}
+        {activeTab === 'verification' && canView('verification') && <VerificationView onUserUpdated={setCurrentUser} onContinue={()=>setActiveTab(workspace.home)} />}
         {/* VIEW: CATALOG & E-COMMERCE (F1) */}
         {activeTab === 'catalog' && canView('catalog') && (
           <div className="space-y-8">

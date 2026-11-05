@@ -28,6 +28,7 @@ export const personaAccess: RequestHandler = (req, res, next) => {
   if (route === '/users') return staff && read ? next() : deny();
   if (route === '/verification' && read) return next();
   if (route === '/verification/documents' && req.method === 'POST' && party) return next();
+  if (route === '/assistant/search') return user.role === 'buyer' ? next() : deny();
   if (/^\/verification\/documents\/[^/]+\/file$/.test(route) && read) return next();
   if (!read && party && user.accountStatus !== 'APPROVED') {
     return res.status(403).json({error:'Your account is awaiting admin approval. Submit documents in Verification.'});
@@ -53,7 +54,6 @@ export const personaAccess: RequestHandler = (req, res, next) => {
     return next();
   }
   if (route === '/audit-logs') return staff && read ? next() : deny();
-  if (route === '/assistant/search') return user.role === 'buyer' ? next() : deny();
   if (route.startsWith('/seller/products')) {
     if (user.role !== 'seller') return deny();
     const id = route.match(/^\/seller\/products\/([^/]+)$/)?.[1];

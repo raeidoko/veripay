@@ -79,12 +79,15 @@ to override the password for all seeded accounts; the override is never exposed 
 the demo account endpoint. Credentials are hashed with a separate salt per account.
 New users click Register on VeriPay, then select Buyer or Seller within the form and register with their
 name (or store name), Nigerian phone number, email, and their own password of at
-least 10 characters. Registration signs them in and opens Verification. New accounts
-start pending and cannot trade until an admin approves an identity document and
-the account. Admin registration is not available. Accounts and salted password
-hashes are saved in the SQLite accounts repository; the demo password override
-does not affect newly registered users. Email delivery and password recovery are
-not implemented.
+least 10 characters. Buyers open Shop and can purchase with their basic account.
+Identity document review is optional for buyers. Sellers open their storefront and
+submit identity documents for administrator approval before trading. Navigation
+also lets pending users view their orders, disputes, and verification status.
+Admin registration is not available. Accounts and salted password hashes use
+PostgreSQL when DATABASE_URL is configured, with local SQLite as the development
+default. The demo password override does not affect registered users. Forgot
+password supports single-use administrator-issued recovery codes after identity
+checks. Automatic email delivery is not configured.
 Sessions are in memory, so restarting the server requires signing in again.
 
 Buyers can add a 1–5 star rating and comment before or after purchasing, and update

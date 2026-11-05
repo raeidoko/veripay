@@ -109,7 +109,7 @@ export function createAiLayer(provider?: AIProvider, timeoutMs = 20000) {
       };
     },
     async searchAndAdvise(query: string, catalog: Product[]) {
-      const reply = await ask('search', { query, catalog: catalog.map(p => ({ id: p.id, name: p.name, description: p.description.slice(0, 200), price: p.price, currency: p.currency })) }, 'Return {"answer": string (max 40 words), "recommendedProductIds": string[] (max 8)}. Only recommend IDs from this catalog. Never invent products or prices.');
+      const reply = await ask('search', { query, catalog: catalog.map(p => ({ id: p.id, name: p.name, description: p.description.slice(0, 200), price: p.price, currency: p.currency, deliveryTerms: p.deliveryTerms, estimatedDays: p.estimatedDays, sellerName: p.sellerName, sellerPassportLevel: p.sellerPassportLevel })) }, 'Return {"answer": string (max 40 words), "recommendedProductIds": string[] (max 8)}. Only recommend IDs from this catalog. Never invent products, prices, seller credentials or delivery promises. Say when the catalog does not confirm a requested dispatch time.');
       const parsed = reply?.value;
       if (isRecord(parsed) && nonempty(parsed.answer) && parsed.answer.length <= 500 && parsed.answer.trim().split(/\s+/).length <= 40 && strings(parsed.recommendedProductIds)) {
         const ids = new Set(catalog.map(p => p.id));

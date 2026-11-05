@@ -58,7 +58,7 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
         <div className="mb-6">
           <div className="mb-4 inline-flex rounded-xl bg-brand-50 p-3 text-brand-600"><Lock className="h-5 w-5" /></div>
           <h2 className="text-xl font-bold text-slate-900">{registering ? 'Create your account' : 'Welcome back'}</h2>
-          <p className="mt-1 text-sm text-slate-500">{registering ? 'Create your account, then submit documents for admin approval.' : 'Sign in to your VeriPay account.'}</p>
+          <p className="mt-1 text-sm text-slate-500">{registering ? role === 'seller' ? 'Create your storefront account, then submit documents for approval.' : 'Buyers can start shopping with their name, email and phone. Identity document review is optional.' : 'Sign in to your VeriPay account.'}</p>
         </div>
         {message && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{message}</p>}
         {notice && <p role="status" className="mb-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">{notice}</p>}

@@ -4,6 +4,8 @@ import path from 'node:path';
 import { platformService, governanceDirectory } from './services/platformService.ts';
 import { authService } from './services/authService.ts';
 import { registrationService } from './services/registrationService.ts';
+import { durableFiles } from './db/persistence.ts';
+import { asyncRoute } from './routes/routeUtils.ts';
 
 export const controlRoutes = express.Router();
 controlRoutes.get('/platform', (_req,res) => {
@@ -30,24 +32,27 @@ controlRoutes.post('/admin/reviews/:id/moderate', action((req,res) => { platform
 controlRoutes.post('/admin/settings', action((req,res) => res.json(platformService.updateSettings(res.locals.user,req.body))));
 controlRoutes.get('/verification', (_req,res) => res.json(platformService.ownVerification(res.locals.user)));
 const types = ['application/pdf','image/jpeg','image/png'];
-controlRoutes.post('/verification/documents', express.raw({type:types,limit:10*1024*1024}), action((req,res) => {
+controlRoutes.post('/verification/documents', express.raw({type:types,limit:10*1024*1024}), asyncRoute(async (req,res) => {
   let filename = req.get('X-File-Name') || 'document';
   try { filename = decodeURIComponent(filename); } catch { /* Keep safe basename fallback */ }
-  res.status(201).json(platformService.uploadDocument(res.locals.user,req.body,req.get('Content-Type') || '',filename,req.get('X-Document-Type') || 'OTHER'));
+  try { res.status(201).json(await platformService.uploadDocument(res.locals.user,req.body,req.get('Content-Type') || '',filename,req.get('X-Document-Type') || 'OTHER')); }
+  catch (error) { res.status(400).json({error:error instanceof Error ? error.message : 'Could not upload document'}); }
 }));
 const uploadError: ErrorRequestHandler = (error,_req,res,_next) => res.status(error.status === 413 ? 413 : 400).json({error:error.status === 413 ? 'Documents must be 10 MB or smaller' : 'Could not upload document'});
 controlRoutes.use('/verification/documents', uploadError);
-controlRoutes.get('/verification/documents/:id/file', (req,res) => {
+controlRoutes.get('/verification/documents/:id/file', asyncRoute(async (req,res) => {
   const doc = platformService.document(req.params.id);
   if (!doc) return res.status(404).json({error:'Document not found'});
   if (res.locals.user.role !== 'admin' && res.locals.user.id !== doc.userId) return res.status(403).json({error:'You cannot access this document'});
   res.set('Cache-Control','no-store');
   res.set('X-Content-Type-Options','nosniff');
+  const stored = durableFiles ? await durableFiles.readFile(`verification/${doc.filename}`) : undefined;
   if (req.query.preview === '1') {
     res.set('Content-Type',doc.mimeType);
     res.set('Content-Disposition','inline');
     res.set('Content-Security-Policy',"sandbox; default-src 'none'; frame-ancestors 'self'");
-    return res.sendFile(path.resolve(governanceDirectory,'documents',doc.filename));
+    return stored ? res.send(stored) : res.sendFile(path.resolve(governanceDirectory,'documents',doc.filename));
   }
+  if (stored) { res.set('Content-Type',doc.mimeType); res.attachment(doc.originalName); return res.send(stored); }
   res.download(path.join(governanceDirectory,'documents',doc.filename),doc.originalName);
-});
+}));

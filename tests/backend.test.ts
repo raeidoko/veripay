@@ -30,7 +30,7 @@ async function login() {
   }
 }
 async function start(sandbox = 'true', filename = dbPath()) {
-  server = spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19373',NODE_ENV:'production',AI_PROVIDER:'rules',VERIPAY_SANDBOX_PAYMENTS:sandbox,VERIPAY_DB_PATH:filename,VERIPAY_ADMIN_DATA_DIR:path.join(directory,'governance'),VERIPAY_UPLOAD_DIR:path.join(directory,'uploads'),VERIPAY_DEMO_PASSWORD:password},windowsHide:true,stdio:['ignore','pipe','pipe']});
+  server = spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,VERIPAY_STORAGE:'sqlite',PORT:'19373',NODE_ENV:'production',AI_PROVIDER:'rules',VERIPAY_SANDBOX_PAYMENTS:sandbox,VERIPAY_DB_PATH:filename,VERIPAY_ADMIN_DATA_DIR:path.join(directory,'governance'),VERIPAY_UPLOAD_DIR:path.join(directory,'uploads'),VERIPAY_DEMO_PASSWORD:password},windowsHide:true,stdio:['ignore','pipe','pipe']});
   await new Promise<void>((resolve,reject) => {
     let output = '';
     const timeout = setTimeout(() => reject(new Error('Backend did not start: '+output)),30000);
@@ -230,7 +230,7 @@ test('orders, inventory, reviews, credentials, trust, audit and wallets survive 
 });
 
 test('maintenance reconciles the ledger and creates a backup that can run the app',async()=>{
-  const env = {...process.env,VERIPAY_DB_PATH:dbPath()};
+  const env = {...process.env,VERIPAY_STORAGE:'sqlite',VERIPAY_DB_PATH:dbPath()};
   const run = (...args:string[])=>execFileSync(process.execPath,['--import','tsx','scripts/database.ts',...args],{cwd:process.cwd(),env,encoding:'utf8',windowsHide:true});
   assert.match(run('check'),/reconciliation passed/);
   const backup = path.join(directory,'backup.sqlite');

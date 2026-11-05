@@ -39,12 +39,12 @@ export const registrationService = {
     if (typeof body.password !== 'string' || body.password.length < 10 || body.password.length > 128) throw new Error('Use a password between 10 and 128 characters');
     if (users.some(user => user.email.toLowerCase() === email)) throw new Error('An account already uses this email. Please sign in.');
     const user: UserProfile = { id: 'user_' + randomUUID(), name, email, phone: phone.startsWith('0') ? '+234' + phone.slice(1) : '+' + phone.replace(/^\+/, ''), role: body.role,
-      accountStatus: 'PENDING', identityVerified: false, identityMethods: [] };
+      accountStatus: body.role === 'buyer' ? 'APPROVED' : 'PENDING', identityVerified: false, identityMethods: [] };
     const salt = randomBytes(16);
     const account: Account = {user, salt:salt.toString('hex'), hash:scryptSync(body.password,salt,64).toString('hex')};
     accounts.push(account);
     users.push(user);
-    auditLogService.log({actorId:user.id,actorName:user.name,actorRole:user.role,action:'ACCOUNT_REGISTERED',entityType:'USER',entityId:user.id,changesSummary:'Account registered; awaiting identity document review and administrator approval.'});
+    auditLogService.log({actorId:user.id,actorName:user.name,actorRole:user.role,action:'ACCOUNT_REGISTERED',entityType:'USER',entityId:user.id,changesSummary:body.role === 'buyer' ? 'Basic buyer account registered with name, email and phone. Identity verification remains optional.' : 'Seller account registered; awaiting document review and administrator approval.'});
     riskService.registerAttribute(user.id, 'PHONE', user.phone);
     if (typeof body.deviceId === 'string' && body.deviceId.trim() && body.deviceId.length <= 200) riskService.registerAttribute(user.id, 'DEVICE', body.deviceId);
     return user;

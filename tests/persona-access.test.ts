@@ -30,7 +30,7 @@ before(async () => {
   await mkdir(tempRoot, { recursive: true });
   uploadTestDirectory = await mkdtemp(path.join(tempRoot, 'test-product-uploads-'));
   server = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
-    cwd: process.cwd(), env: { ...process.env, PORT: String(port), NODE_ENV: 'production', AI_PROVIDER: 'rules', VERIPAY_UPLOAD_DIR: uploadTestDirectory, VERIPAY_ADMIN_DATA_DIR: path.join(uploadTestDirectory,'governance'), VERIPAY_DEMO_PASSWORD: testPassword },
+    cwd: process.cwd(), env: { ...process.env,VERIPAY_STORAGE:'sqlite', PORT: String(port), NODE_ENV: 'production', AI_PROVIDER: 'rules', VERIPAY_UPLOAD_DIR: uploadTestDirectory, VERIPAY_ADMIN_DATA_DIR: path.join(uploadTestDirectory,'governance'), VERIPAY_DEMO_PASSWORD: testPassword },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   await new Promise<void>((resolve, reject) => {
@@ -356,7 +356,9 @@ test('pending users submit private documents and cannot trade until an admin app
   const pending=personas.find(user=>user.id==='user_suspect_2');
   const admin=persona('admin');
   assert.equal((await request('/orders',pending.id,{items:[{productId:products[0].id,quantity:1}]})).status,403);
-  assert.equal((await request(`/admin/users/${pending.id}/status`,admin.id,{status:'APPROVED',notes:'Checked the account'})).status,400);
+  assert.equal((await request('/assistant/search',pending.id,{query:'Which laptops have next-day dispatch?'})).status,200);
+  assert.equal((await request(`/admin/users/${pending.id}/status`,admin.id,{status:'APPROVED',notes:'Basic buyer account reviewed'})).status,200);
+  assert.equal((await request(`/admin/users/${pending.id}/status`,admin.id,{status:'PENDING',notes:'Requested an additional identity review'})).status,200);
   const uploaded=await fetch(base+'/verification/documents',{method:'POST',headers:{Cookie:cookies.get(pending.id)!,'Content-Type':'image/png','X-Document-Type':'IDENTITY','X-File-Name':'test-identity.png'},body:new Uint8Array(tinyPng)});
   assert.equal(uploaded.status,201);
   const doc=await uploaded.json(); approvalDocumentId=doc.id;
@@ -422,12 +424,12 @@ test('admin controls purchases, announcements and review visibility with audit r
 
 test('approval decisions, documents, settings and created listings survive a fresh process', () => {
   const script = `import {platformService} from './src/server/services/platformService.ts'; const s=platformService.control();console.log(JSON.stringify({account:s.users.find(u=>u.id==='user_suspect_2').accountStatus,document:s.documents.find(d=>d.id==='${approvalDocumentId}').status,announcement:s.settings.announcement,product:s.products.find(p=>p.id==='${moderatedProductId}').moderationStatus}));`;
-  const output=execFileSync(process.execPath,['--import','tsx','--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},encoding:'utf8',windowsHide:true});
+  const output=execFileSync(process.execPath,['--import','tsx','--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,VERIPAY_STORAGE:'sqlite',VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},encoding:'utf8',windowsHide:true});
   assert.deepEqual(JSON.parse(output.trim()),{account:'APPROVED',document:'APPROVED',announcement:'Marketplace open',product:'HIDDEN'});
 });
 
 test('development file serving cannot bypass private document and governance authorization', async () => {
-  const dev=spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,PORT:'19372',NODE_ENV:'development',AI_PROVIDER:'rules',VERIPAY_DEMO_PASSWORD:testPassword,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},stdio:['ignore','pipe','pipe'],windowsHide:true});
+  const dev=spawn(process.execPath,['--import','tsx','server.ts'],{cwd:process.cwd(),env:{...process.env,VERIPAY_STORAGE:'sqlite',PORT:'19372',NODE_ENV:'development',AI_PROVIDER:'rules',VERIPAY_DEMO_PASSWORD:testPassword,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},stdio:['ignore','pipe','pipe'],windowsHide:true});
   try {
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Dev server did not start')),30000);let output='';dev.stdout!.on('data',chunk=>{output+=chunk;if(output.includes('Server running on port')){clearTimeout(timer);resolve();}});dev.once('error',error=>{clearTimeout(timer);reject(error);});dev.once('exit',code=>{clearTimeout(timer);reject(new Error('Dev server exited '+code));});});
     const statePath=path.join(uploadTestDirectory,'governance','state.json');
@@ -504,13 +506,13 @@ test('user profile and document previews remain protected and support in-page vi
 });
 
 const registeredAccounts:{id:string;email:string;password:string;role:string}[]=[];
-test('buyer and seller registration creates pending, unverified accounts linked to the admin workflow',async()=>{
+test('buyers can shop immediately while sellers require approval and identity stays unverified',async()=>{
   for(const role of ['buyer','seller']) {
     const email=`new-${role}@example.com`;const password='UniqueRegistration456!';
     const response=await fetch(base+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:role==='seller'?'New Seller Shop':'New Buyer',email,phone:'0803 999 4455',password,role,accountStatus:'APPROVED',identityVerified:true,identityMethods:['NIN'],id:'spoofed'})});
     assert.equal(response.status,201);
     const {user}=await response.json();
-    assert.equal(user.role,role);assert.equal(user.accountStatus,'PENDING');assert.equal(user.identityVerified,false);assert.deepEqual(user.identityMethods,[]);assert.notEqual(user.id,'spoofed');
+    assert.equal(user.role,role);assert.equal(user.accountStatus,role==='buyer'?'APPROVED':'PENDING');assert.equal(user.identityVerified,false);assert.deepEqual(user.identityMethods,[]);assert.notEqual(user.id,'spoofed');
     assert.equal(user.phone,'+2348039994455');
     assert.ok(!('password' in user));assert.ok(!('hash' in user));
     const cookie=response.headers.get('set-cookie')!.split(';')[0];
@@ -519,7 +521,7 @@ test('buyer and seller registration creates pending, unverified accounts linked 
     assert.equal((await (await fetch(base+'/auth/me',{headers})).json()).user.id,user.id);
     assert.equal((await fetch(base+'/admin/control',{headers})).status,403);
     const tradingRoute=role==='buyer'?'/orders':'/seller/products';
-    assert.equal((await fetch(base+tradingRoute,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:'{}'})).status,403);
+    assert.equal((await fetch(base+tradingRoute,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:'{}'})).status,role==='buyer'?400:403);
     const file=await fetch(base+'/verification/documents',{method:'POST',headers:{...headers,'Content-Type':'image/png','X-Document-Type':'IDENTITY','X-File-Name':'new-account-document.png'},body:new Uint8Array(tinyPng)});
     assert.equal(file.status,201);
     const profile=await request(`/admin/users/${user.id}/profile`,persona('admin').id);
@@ -544,6 +546,6 @@ test('registration validates fields, rejects duplicates, and cannot create admin
 
 test('registered accounts and their own password hashes persist across a fresh process',()=>{
   const script=`import {registrationService} from './src/server/services/registrationService.ts';import {users} from './src/server/db/store.ts';import {scryptSync,timingSafeEqual} from 'node:crypto';const ids=${JSON.stringify(registeredAccounts.map(account=>account.id))};console.log(JSON.stringify(ids.map(id=>{const user=users.find(u=>u.id===id);const credential=registrationService.credential(id);return {role:user.role,status:user.accountStatus,valid:timingSafeEqual(scryptSync('UniqueRegistration456!',credential.salt,64),credential.hash)};})));`;
-  const output=execFileSync(process.execPath,['--import','tsx','--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},encoding:'utf8',windowsHide:true});
-  assert.deepEqual(JSON.parse(output.trim()),[{role:'buyer',status:'PENDING',valid:true},{role:'seller',status:'PENDING',valid:true}]);
+  const output=execFileSync(process.execPath,['--import','tsx','--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,VERIPAY_STORAGE:'sqlite',VERIPAY_ADMIN_DATA_DIR:path.join(uploadTestDirectory,'governance')},encoding:'utf8',windowsHide:true});
+  assert.deepEqual(JSON.parse(output.trim()),[{role:'buyer',status:'APPROVED',valid:true},{role:'seller',status:'PENDING',valid:true}]);
 });

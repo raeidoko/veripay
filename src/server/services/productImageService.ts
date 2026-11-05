@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MAX_PRODUCT_IMAGE_BYTES } from '../../shared/productImages.ts';
+import { durableFiles } from '../db/persistence.ts';
 
 export const productImageDirectory = process.env.VERIPAY_UPLOAD_DIR || path.join(process.cwd(), 'data', 'uploads', 'products');
 
@@ -16,5 +17,6 @@ export async function saveProductImage(bytes: Buffer, mimeType: string): Promise
   const filename = `${randomUUID()}.${extension}`;
   await mkdir(productImageDirectory, { recursive: true });
   await writeFile(path.join(productImageDirectory, filename), bytes, { flag: 'wx' });
+  if (durableFiles) await durableFiles.saveFile(`products/${filename}`, bytes);
   return `/uploads/products/${filename}`;
 }

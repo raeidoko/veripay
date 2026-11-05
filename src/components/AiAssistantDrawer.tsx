@@ -28,7 +28,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
     {
       id: 'msg_welcome',
       sender: 'assistant',
-      text: 'Hello! I am the VeriPay Shopping Assistant. Ask me about products, verified seller trust ratings, guaranteed delivery timelines, or how our escrow protects your purchase.',
+      text: 'Hello! Ask me about products in our catalog, their delivery terms, or how escrow protects your purchase.',
       suggestedFilters: [
         'Which laptops have next-day dispatch?',
         'Show me Crown-tier luxury watches',
@@ -77,7 +77,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         {
           id: `ai_err_${Date.now()}`,
           sender: 'assistant',
-          text: 'I could not reach the catalog assistant at the moment. Please try again or browse the products directly.',
+          text: err instanceof Error ? err.message : 'The assistant could not load a reply. Please try again.',
         },
       ]);
     } finally {

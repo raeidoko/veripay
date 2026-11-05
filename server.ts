@@ -1,4 +1,6 @@
 import 'dotenv/config';
+// Resolve the database before evaluating the services that share domain state.
+import './src/server/db/persistence.ts';
 import express from 'express';
 import type { ErrorRequestHandler } from 'express';
 import { createServer as createViteServer } from 'vite';
@@ -11,7 +13,7 @@ import { MAX_PRODUCT_IMAGE_BYTES, PRODUCT_IMAGE_TYPES } from './src/shared/produ
 import { authService } from './src/server/services/authService.ts';
 import { controlRoutes } from './src/server/controlRoutes.ts';
 import { domainRoutes } from './src/server/routes/domainRoutes.ts';
-import { databasePath, initializePersistence, persistenceMiddleware, storageHealth } from './src/server/db/persistence.ts';
+import { databasePath, initializePersistence, persistenceMiddleware, storageHealth, durableFiles } from './src/server/db/persistence.ts';
 import { governanceDirectory } from './src/server/services/platformService.ts';
 import { sandboxPayments, walletService } from './src/server/services/walletService.ts';
 import { asyncRoute } from './src/server/routes/routeUtils.ts';
@@ -26,13 +28,13 @@ async function startServer() {
   const app = express();
   const PORT = serverPort();
   walletService.initialize();
-  initializePersistence();
+  await initializePersistence();
 
   app.use(express.json());
   app.disable('x-powered-by');
   app.use((_req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); res.set('Referrer-Policy', 'same-origin'); next(); });
-  app.get('/api/health', (_req, res) => {
-    try { res.set('Cache-Control','no-store').json({ok:true, storage:storageHealth(), payments:sandboxPayments ? 'sandbox' : 'unconfigured'}); }
+  app.get('/api/health', async (_req, res) => {
+    try { res.set('Cache-Control','no-store').json({ok:true, storage:await storageHealth(), payments:sandboxPayments ? 'sandbox' : 'unconfigured'}); }
     catch { res.status(503).json({ok:false,error:'Database is unavailable'}); }
   });
   app.use('/api', persistenceMiddleware);
@@ -53,6 +55,14 @@ async function startServer() {
   });
   app.use('/api', personaAccess);
   app.use('/api', controlRoutes);
+  app.get('/uploads/products/:filename', asyncRoute(async (req, res, next) => {
+    if (!durableFiles) { next(); return; }
+    const filename = req.params.filename;
+    if (!/^[a-f0-9-]+\.(png|jpg|webp)$/.test(filename)) { res.sendStatus(404); return; }
+    const bytes = await durableFiles.readFile(`products/${filename}`);
+    if (!bytes) { next(); return; }
+    res.type(path.extname(filename)).set('Cache-Control','public, max-age=31536000, immutable').send(bytes);
+  }));
   app.use('/uploads/products', express.static(productImageDirectory, {
     immutable: true, maxAge: '1y', fallthrough: false,
     setHeaders: res => res.setHeader('X-Content-Type-Options', 'nosniff'),

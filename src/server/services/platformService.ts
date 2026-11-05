@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import './registrationService.ts';
+import { registrationService } from './registrationService.ts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AdminUserProfile, AuditLogEntry, PlatformSettings, Product, UserProfile, VerificationDocument } from '../../shared/types.ts';
 import { users, products, orders, disputes, auditLogs, trustProfiles } from '../db/store.ts';
 import { auditLogService } from './auditLogService.ts';
 import { productReviewService } from './productReviewService.ts';
-import { registerState, hasSavedState } from '../db/persistence.ts';
+import { registerState, hasSavedState, durableFiles, afterPersistenceLoad } from '../db/persistence.ts';
 import { governancePath } from '../config.ts';
 
 export const governanceDirectory = governancePath;
@@ -27,6 +27,12 @@ for (const restored of hasSavedState('products') ? [] : state.createdProducts ||
   if (index < 0) products.push(restored); else products[index] = restored;
 }
 for (const user of users) Object.assign(user, state.users[user.id] || { accountStatus: user.accountStatus || 'APPROVED' });
+// Existing buyers waiting only for onboarding inherit the simpler buyer flow.
+afterPersistenceLoad(() => {
+  for (const user of users) {
+    if (user.role === 'buyer' && user.accountStatus === 'PENDING' && registrationService.credential(user.id) && !state.users[user.id]) user.accountStatus = 'APPROVED';
+  }
+});
 for (const product of products) Object.assign(product, state.products[product.id] || { moderationStatus: 'PUBLISHED' });
 for (const event of state.events) if (!auditLogs.some(item => item.id === event.id)) auditLogs.push(event);
 
@@ -85,7 +91,7 @@ export const platformService = {
     if (user.role === 'admin') throw new Error('Admin accounts cannot be changed here');
     if (!['APPROVED', 'REJECTED', 'SUSPENDED', 'PENDING'].includes(String(status))) throw new Error('Invalid account status');
     const notes = note(reason);
-    if (status === 'APPROVED' && user.accountStatus !== 'APPROVED' && !state.documents.some(doc => doc.userId === id && doc.kind === 'IDENTITY' && doc.status === 'APPROVED')) {
+    if (status === 'APPROVED' && user.role === 'seller' && user.accountStatus !== 'APPROVED' && !state.documents.some(doc => doc.userId === id && doc.kind === 'IDENTITY' && doc.status === 'APPROVED')) {
       throw new Error('Approve an identity document before approving this account');
     }
     state.users[id] = { accountStatus: status as UserProfile['accountStatus'], approvalNotes: notes };
@@ -93,7 +99,7 @@ export const platformService = {
     log(actor, 'ACCOUNT_' + status, 'USER', id, `${user.name}: ${notes}`);
     return user;
   },
-  uploadDocument(user: UserProfile, bytes: Buffer, mimeType: string, originalName: string, kind: string) {
+  async uploadDocument(user: UserProfile, bytes: Buffer, mimeType: string, originalName: string, kind: string) {
     if (!['IDENTITY', 'BUSINESS', 'ADDRESS', 'OTHER'].includes(kind)) throw new Error('Choose a document type');
     if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error('Upload a document up to 10 MB');
     let extension = '';
@@ -105,6 +111,7 @@ export const platformService = {
     const filename = id + '.' + extension;
     mkdirSync(path.join(governanceDirectory, 'documents'), {recursive:true});
     writeFileSync(path.join(governanceDirectory, 'documents', filename), bytes, {flag:'wx'});
+    if (durableFiles) await durableFiles.saveFile(`verification/${filename}`, bytes);
     const doc: VerificationDocument = { id, userId: user.id, userName: user.name, kind: kind as VerificationDocument['kind'], originalName: path.basename(originalName).replace(/[\r\n]/g,'').slice(0,160) || ('document.' + extension), filename, mimeType, size:bytes.length, status:'PENDING', uploadedAt:new Date().toISOString() };
     state.documents.push(doc);
     state.events.push(auditLogService.log({actorId:user.id,actorName:user.name,actorRole:user.role,action:'DOCUMENT_UPLOADED',entityType:'DOCUMENT',entityId:id,changesSummary:`${kind} document submitted for admin review`}));
