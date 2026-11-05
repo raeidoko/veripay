@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, RefreshCw, Filter, FileText, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { AuditLogEntry } from '../shared/types.ts';
 import { api } from '../client/api.ts';
 

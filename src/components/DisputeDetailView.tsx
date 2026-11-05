@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import {
   FileText,
-  Clock,
   Sparkles,
   UserCheck,
   CheckCircle,
-  XCircle,
   PhoneCall,
-  Send,
   MessageSquare,
-  Lock,
   ArrowLeft,
   FileCheck2,
 } from 'lucide-react';

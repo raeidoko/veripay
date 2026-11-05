@@ -95,6 +95,31 @@ test('missing or unknown sessions cannot access protected features', async () =>
   assert.equal((await request('/audit-logs', 'unknown')).status, 401);
 });
 
+test('registered users can change their password with a single-use administrator recovery code', async () => {
+  const email = 'recovery-test@example.com';
+  const oldPassword = 'RecoveryTest123!';
+  const password = 'RecoveryChanged456!';
+  const registration = await fetch(base + '/auth/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Recovery Test', email, phone: '08039011222', password: oldPassword, role: 'buyer' }),
+  });
+  assert.equal(registration.status, 201);
+  const { user } = await registration.json();
+  cookies.set(user.id, registration.headers.get('set-cookie')!.split(';')[0]);
+  const endpoint = `/admin/users/${user.id}/password-reset`;
+  assert.equal((await request(endpoint, user.id, { identityVerified: true })).status, 403);
+  assert.equal((await request(endpoint, persona('admin').id, {})).status, 400);
+  const issued = await request(endpoint, persona('admin').id, { identityVerified: true });
+  assert.equal(issued.status, 200);
+  assert.equal(issued.data.expiresInMinutes, 15);
+  const input = { code: issued.data.code, password };
+  assert.deepEqual(await request('/auth/password-reset', undefined, input), { status: 200, data: { success: true } });
+  assert.equal((await request('/auth/password-reset', undefined, input)).status, 400);
+  assert.equal((await request('/auth/me', user.id)).status, 401);
+  assert.equal((await request('/auth/login', undefined, { email, password: oldPassword })).status, 401);
+  assert.equal((await request('/auth/login', undefined, { email, password })).status, 200);
+});
+
 test('buyers and sellers only receive their own orders and disputes, despite spoofed query roles', async () => {
   for (const user of personas.filter(u => ['buyer', 'seller'].includes(u.role))) {
     const result = await request('/orders?role=admin&userId=user_admin_1', user.id);

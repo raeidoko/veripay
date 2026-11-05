@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../client/api.ts';
 
 export function WalletPanel({canTopup, revision}: {canTopup:boolean;revision:string}) {

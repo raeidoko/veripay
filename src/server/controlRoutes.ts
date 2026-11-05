@@ -2,6 +2,8 @@ import express from 'express';
 import type { ErrorRequestHandler } from 'express';
 import path from 'node:path';
 import { platformService, governanceDirectory } from './services/platformService.ts';
+import { authService } from './services/authService.ts';
+import { registrationService } from './services/registrationService.ts';
 
 export const controlRoutes = express.Router();
 controlRoutes.get('/platform', (_req,res) => {
@@ -9,10 +11,14 @@ controlRoutes.get('/platform', (_req,res) => {
   res.json({announcement,purchasesPaused});
 });
 controlRoutes.get('/admin/control', (_req,res) => res.json(platformService.control()));
+controlRoutes.post('/admin/users/:id/password-reset', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  authService.issuePasswordReset(req, res);
+});
 controlRoutes.get('/admin/users/:id/profile', (req,res) => {
   const profile = platformService.userProfile(req.params.id);
   if (!profile) return res.status(404).json({error:'Account not found'});
-  res.json(profile);
+  res.json({ ...profile, canResetPassword: profile.user.role !== 'admin' && Boolean(registrationService.credential(profile.user.id)) });
 });
 function action(handler: (req: express.Request, res: express.Response) => unknown): express.RequestHandler {
   return (req,res) => { try { handler(req,res); } catch (error: unknown) { res.status(400).json({error:error instanceof Error ? error.message : 'Action failed'}); } };

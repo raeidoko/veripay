@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Award,
   Crown,
-  Shield,
   CheckCircle2,
-  Clock,
-  HelpCircle,
   Flag,
-  ArrowUpRight,
   TrendingUp,
-  FileCheck2,
-  Check,
-  X,
 } from 'lucide-react';
-import { TrustProfile, TrustEvent, TrustChallenge, UserProfile } from '../shared/types.ts';
+import { TrustProfile, TrustEvent, UserProfile } from '../shared/types.ts';
 import { api } from '../client/api.ts';
 import { TrustBadge } from './TrustBadge.tsx';
 

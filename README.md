@@ -38,6 +38,12 @@ npm start
 npm start serves the built web app and API together. npm run preview previews
 only the static frontend; use npm start for working API routes.
 
+## Hosting
+
+The included [Render Blueprint](render.yaml) hosts the frontend and backend
+together with persistent storage. See [Hosting setup](docs/HOSTING.md) for
+deployment, credentials, and backup instructions.
+
 ## Demo behavior
 
 Sign in with an email address and password. Accounts open their buyer, seller, or admin workspace.

@@ -6,13 +6,9 @@ import {
   Search,
   Truck,
   CheckCircle2,
-  AlertCircle,
   FileCheck2,
   ArrowRight,
-  UserCheck,
-  ChevronDown,
   Lock,
-  Plus,
   RefreshCw,
 } from 'lucide-react';
 import {
@@ -125,7 +121,7 @@ export default function App() {
     let cancelled = false;
     localStorage.removeItem('veripay.persona');
     api.getSession().then(user => { if (!cancelled && user) acceptSignedInUser(user); })
-      .catch(() => { if (!cancelled) setAuthMessage('Could not connect to VeriPay. Check that the local server is running.'); })
+      .catch(() => { if (!cancelled) setAuthMessage('VeriPay is temporarily unavailable. Please try again shortly.'); })
       .finally(() => { if (!cancelled) setAuthChecked(true); });
     const expired = () => { clearAccount(); setAuthMessage('Your session has ended. Please sign in again.'); };
     window.addEventListener('veripay:session-expired', expired);
@@ -237,7 +233,7 @@ export default function App() {
   };
 
   // F2: Buyer confirmed purchase intent
-  const handlePurchaseConfirmed = async (snapshot: PurchaseSnapshot) => {
+  const handlePurchaseConfirmed = async (_snapshot: PurchaseSnapshot) => {
     setShowConfirmationModal(false);
     if (orderForConfirmation) {
       try {
@@ -400,10 +396,11 @@ export default function App() {
             {canShop && <>
             <button
               onClick={() => setShowAssistantDrawer(true)}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
+              aria-label="AI Assistant"
+              className="inline-flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-brand-600" />
-              <span>AI Assistant</span>
+              <span className="hidden sm:inline">AI Assistant</span>
             </button>
 
             {/* Shopping Cart Pill Button */}

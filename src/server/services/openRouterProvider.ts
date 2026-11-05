@@ -36,7 +36,7 @@ export function readDots3Response(data: unknown): string {
 export function createOpenRouterProvider(
   config: { apiKey: string; model?: string },
   request: typeof fetch = fetch,
-): AIProvider {
+) {
   const apiKey = config.apiKey.trim();
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
   const model = config.model?.trim() || DOTS3_MODEL;
@@ -54,7 +54,7 @@ export function createOpenRouterProvider(
       if (!response.ok) throw new Error(`OpenRouter request failed (${response.status})`);
       return readDots3Response(await response.json());
     },
-  };
+  } satisfies AIProvider;
 }
 
 export function configuredAIProvider(env: NodeJS.ProcessEnv = process.env): AIProvider | undefined {

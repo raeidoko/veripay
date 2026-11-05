@@ -2,15 +2,21 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import type { Request, Response } from 'express';
 import { users } from '../db/store.ts';
 import { registrationService } from './registrationService.ts';
+import { registerState } from '../db/persistence.ts';
+import { auditLogService } from './auditLogService.ts';
 
 const cookieName = 'veripay_session';
 const lifetimeMs = 8 * 60 * 60 * 1000;
 const defaultPassword = 'VeriPay123!';
-const password = process.env.VERIPAY_DEMO_PASSWORD || defaultPassword;
-const credentials = new Map(users.map(user => {
+const configuredPassword = process.env.VERIPAY_DEMO_PASSWORD;
+const validHostedPassword = configuredPassword && configuredPassword.trim().length >= 10 && configuredPassword.length <= 128 && configuredPassword !== defaultPassword;
+const password = process.env.NODE_ENV === 'production'
+  ? validHostedPassword ? configuredPassword : undefined
+  : configuredPassword || defaultPassword;
+const credentials = new Map(password ? users.map(user => {
   const salt = randomBytes(16);
   return [user.id, { salt, hash: scryptSync(password, salt, 64) }];
-}));
+}) : []);
 const dummy = { salt: randomBytes(16), hash: randomBytes(64) };
 const sessions = new Map<string, { userId: string; expiresAt: number }>();
 const attempts = new Map<string, { count: number; until: number }>();
@@ -25,8 +31,62 @@ function issueSession(req: Request, res: Response, userId: string) {
   res.cookie(cookieName,token,{httpOnly:true,sameSite:'lax',secure:req.secure,path:'/',maxAge:lifetimeMs});
 }
 const registrations = new Map<string,{count:number;until:number}>();
+const resetAttempts = new Map<string, { count: number; until: number }>();
+const resetCodes = registerState('passwordResetCodes', {} as Record<string, { hash: string; expiresAt: number }>);
+const resetLifetimeMs = 15 * 60 * 1000;
 
 export const authService = {
+  issuePasswordReset(req: Request, res: Response) {
+    const admin = res.locals.user;
+    if (admin?.role !== 'admin') return res.status(403).json({ error: 'Administrator access required' });
+    const user = users.find(item => item.id === req.params.id);
+    if (!user || user.role === 'admin' || !registrationService.credential(user.id)) {
+      return res.status(404).json({ error: 'Password recovery is available for registered buyer and seller accounts' });
+    }
+    if (req.body?.identityVerified !== true) return res.status(400).json({ error: 'Verify the account owner before issuing a code' });
+    const now = Date.now();
+    for (const [id, code] of Object.entries(resetCodes)) if (code.expiresAt <= now) delete resetCodes[id];
+    if ((resetCodes[user.id]?.expiresAt ?? 0) > now + resetLifetimeMs - 60_000) {
+      res.set('Retry-After', '60');
+      return res.status(429).json({ error: 'Wait one minute before issuing another code for this account' });
+    }
+    const code = randomBytes(16).toString('hex');
+    resetCodes[user.id] = { hash: digest(code), expiresAt: now + resetLifetimeMs };
+    auditLogService.log({ actorId: admin.id, actorName: admin.name, actorRole: 'admin', action: 'PASSWORD_RESET_ISSUED', entityType: 'USER', entityId: user.id, changesSummary: 'Administrator confirmed identity verification and issued a single-use recovery code.' });
+    return res.json({ code, expiresInMinutes: 15 });
+  },
+
+  resetPassword(req: Request, res: Response) {
+    const now = Date.now();
+    for (const [ip, attempt] of resetAttempts) if (attempt.until <= now) resetAttempts.delete(ip);
+    const ip = req.ip || 'local';
+    const attempt = resetAttempts.get(ip);
+    if (attempt && attempt.count >= 15) {
+      res.set('Retry-After', String(Math.ceil((attempt.until - now) / 1000)));
+      return res.status(429).json({ error: 'Too many password reset attempts. Try again later.' });
+    }
+    resetAttempts.set(ip, { count: (attempt?.count || 0) + 1, until: attempt?.until || now + resetLifetimeMs });
+    const { code, password } = req.body || {};
+    if (typeof password !== 'string' || password.length < 10 || password.length > 128) {
+      return res.status(400).json({ error: 'Use a password between 10 and 128 characters' });
+    }
+    const hash = typeof code === 'string' && /^[a-f0-9]{32}$/.test(code) ? digest(code) : '';
+    const match = Object.entries(resetCodes).find(([, entry]) => entry.expiresAt > now && entry.hash === hash);
+    if (!match || !registrationService.replacePassword(match[0], password)) {
+      return res.status(400).json({ error: 'This recovery code is invalid or expired' });
+    }
+    const [userId] = match;
+    delete resetCodes[userId];
+    auditLogService.log({ actorId: userId, actorName: 'Account holder', actorRole: 'SYSTEM', action: 'PASSWORD_RESET_COMPLETED', entityType: 'USER', entityId: userId, changesSummary: 'Password changed through a single-use recovery code.' });
+    res.once('finish', () => {
+      if (res.statusCode !== 200) return;
+      for (const [key, session] of sessions) if (session.userId === userId) sessions.delete(key);
+      const email = users.find(user => user.id === userId)?.email.toLowerCase();
+      if (email) for (const key of attempts.keys()) if (key.endsWith(`:${email}`)) attempts.delete(key);
+    });
+    return res.json({ success: true });
+  },
+
   register(req: Request, res: Response) {
     const now = Date.now();
     for (const [key,value] of registrations) if(value.until<=now) registrations.delete(key);
@@ -50,7 +110,8 @@ export const authService = {
       accounts: users.filter(user => ['user_buyer_1', 'user_seller_1', 'user_admin_1'].includes(user.id))
         .map(({ email, name, role }) => ({ email, name, role })),
       // Only expose the intentionally public default demo password, never an override.
-      demoPassword: process.env.VERIPAY_DEMO_PASSWORD ? null : defaultPassword,
+      demoPassword: password === defaultPassword && !configuredPassword ? defaultPassword : null,
+      enabled: Boolean(password),
     };
   },
 

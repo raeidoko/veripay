@@ -3,12 +3,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   Link2,
-  CheckCircle,
-  XCircle,
-  UserX,
-  FileCheck,
   RefreshCw,
-  Search,
 } from 'lucide-react';
 import { RiskAssessment, IdentityLink } from '../shared/types.ts';
 import { api } from '../client/api.ts';

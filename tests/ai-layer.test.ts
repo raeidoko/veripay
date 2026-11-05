@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAiLayer, keywordSearch, type AIProvider } from '../src/server/services/aiLayer.ts';
+import { createAnthropicProvider } from '../src/server/services/anthropicProvider.ts';
 import type { Dispute, Product, Order, DeliveryVerification } from '../src/shared/types.ts';
 const catalog = [
   { id: 'shoe', name: 'Red shoes', description: 'Leather footwear', category: 'Fashion' },
@@ -34,6 +35,19 @@ test('confirmation preserves all order facts without a model', async () => {
   assert.equal(result.headline, 'Is this what you really want to purchase?');
   assert.match(result.summaryText, /2 x Shoes.*NGN 5,000.00.*Example Seller.*NGN 10,200.00/);
   assert.ok(result.keyCheckpoints.includes('Agreed delivery terms: Three days after dispatch'));
+  assert.equal(result.source, 'rules');
+  const claude = createAnthropicProvider('test-key', 'claude-test', async (url, init) => {
+    assert.equal(url, 'https://api.anthropic.com/v1/messages');
+    const body = JSON.parse(String(init?.body));
+    assert.deepEqual(JSON.parse(body.messages[0].content), { task: 'confirmation', facts: {} });
+    return Response.json({ model: 'claude-test-version', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"guidance":"Take a moment to check your order details."}' }] });
+  });
+  const generated = await createAiLayer(claude).generateConfirmationPrompt(order);
+  assert.equal(generated.source, 'ai');
+  assert.equal(generated.modelVersion, 'claude-test-version');
+  assert.equal(generated.guidance, 'Take a moment to check your order details.');
+  assert.equal(generated.summaryText, result.summaryText);
+  assert.equal((await createAiLayer(provider({ guidance: 'Your total is 50.' })).generateConfirmationPrompt(order)).source, 'rules');
 });
 test('search filters fabricated IDs and duplicates; malformed output falls back', async () => {
   const layer = createAiLayer(provider({ answer: 'Try these.', recommendedProductIds: ['shoe', 'fake', 'shoe'] }));

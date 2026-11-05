@@ -1,7 +1,6 @@
 import {
   Dispute,
   DisputeOutcome,
-  DisputeState,
   AIRecommendation,
   InfoRequest,
   EvidenceItem,

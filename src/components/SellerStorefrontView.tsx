@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Package, Edit3, CheckCircle2, Truck, ShieldCheck, Sparkles } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Product, UserProfile } from '../shared/types.ts';
 import { api } from '../client/api.ts';
-import { TrustBadge } from './TrustBadge.tsx';
 import { ProductImagePicker } from './ProductImagePicker.tsx';
 
 interface SellerStorefrontViewProps {

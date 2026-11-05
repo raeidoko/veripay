@@ -39,6 +39,7 @@ async function startServer() {
   app.use('/api', requestOriginGuard(process.env.VERIPAY_PUBLIC_ORIGIN));
   app.get('/api/auth/demo-accounts', (_req, res) => { res.set('Cache-Control', 'no-store').json(authService.demoAccounts()); });
   app.post('/api/auth/login', (req, res) => { res.set('Cache-Control', 'no-store'); authService.login(req, res); });
+  app.post('/api/auth/password-reset', (req, res) => { res.set('Cache-Control', 'no-store'); authService.resetPassword(req, res); });
   app.post('/api/auth/register', (req, res) => { res.set('Cache-Control','no-store'); authService.register(req,res); });
   app.get('/api/auth/me', (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -100,6 +101,7 @@ async function startServer() {
   // ---------------- DEV VITE MIDDLEWARE ----------------
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'dist')));
+    app.use(['/brand', '/assets', '/images'], (_req, res) => { res.sendStatus(404); });
     app.get('*', (_req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });

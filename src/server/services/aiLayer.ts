@@ -1,9 +1,10 @@
 import type { Order, Product, Dispute, PurchaseSnapshot, DeliveryVerification, EvidenceItem, AIRecommendation } from '../../shared/types.ts';
 import { configuredAIProvider } from './openRouterProvider.ts';
+import { createAnthropicProvider } from './anthropicProvider.ts';
 
 export interface AIProvider {
   modelVersion: string;
-  generate(request: { task: 'search' | 'dispute'; system: string; input: unknown; signal: AbortSignal }): Promise<string>;
+  generate(request: { task: 'search' | 'dispute' | 'confirmation'; system: string; input: unknown; signal: AbortSignal }): Promise<string | { text: string; modelVersion: string }>;
 }
 type Analysis = Pick<AIRecommendation, 'findings' | 'inconsistencies' | 'recommendedOutcome' | 'confidence' | 'rationale' | 'infoRequests' | 'source' | 'modelVersion'>;
 const rulesVersion = 'veripay-rules-v2';
@@ -77,47 +78,69 @@ function validateAnalysis(value: unknown): Omit<Analysis, 'source' | 'modelVersi
   };
 }
 export function createAiLayer(provider?: AIProvider, timeoutMs = 20000) {
-  async function ask(task: 'search' | 'dispute', input: unknown, instructions: string): Promise<unknown> {
+  async function ask(task: Parameters<AIProvider['generate']>[0]['task'], input: unknown, instructions: string) {
     if (!provider) return null;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     try {
       const timeout = new Promise<null>(resolve => { timer = setTimeout(() => { controller.abort(); resolve(null); }, timeoutMs); });
       const response = await Promise.race([provider.generate({ task, system: `${system} ${instructions}`, input, signal: controller.signal }), timeout]);
-      return typeof response === 'string' ? parseJSON(response) : null;
+      if (!response) return null;
+      return typeof response === 'string'
+        ? { value: parseJSON(response), modelVersion: provider.modelVersion }
+        : { value: parseJSON(response.text), modelVersion: response.modelVersion };
     } catch { return null; } finally { clearTimeout(timer!); }
   }
   return {
-    // Financial confirmation facts remain deterministic, regardless of provider.
     async generateConfirmationPrompt(order: Order, _sellerPassportLevel?: string) {
       const money = (amount: number) => `${order.currency} ${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // Keep authoritative order facts separate from model-written guidance.
+      const reply = await ask('confirmation', {}, 'Write one short sentence inviting the buyer to review the order details below before confirming. Do not state any order facts, promises, or instructions to pay. Return {"guidance": string}.');
+      const guidance = isRecord(reply?.value) && typeof reply.value.guidance === 'string' ? reply.value.guidance.trim() : '';
+      const hasGuidance = /^[A-Za-z][A-Za-z ,’'-]{12,119}\.$/.test(guidance);
       return {
         headline: 'Is this what you really want to purchase?',
+        guidance: hasGuidance ? guidance : 'Review your order details before confirming.',
+        source: hasGuidance ? 'ai' as const : 'rules' as const,
+        modelVersion: hasGuidance ? reply!.modelVersion : rulesVersion,
         summaryText: `You are purchasing ${order.items.map(item => `${item.quantity} x ${item.productName} (${item.variantName || 'Standard'}) at ${money(item.unitPrice)} each`).join('; ')} from ${order.sellerName}. Total including escrow fee: ${money(order.totalAmount)}.`,
         keyCheckpoints: [`Delivery destination: ${order.deliveryAddress}`, `Agreed delivery terms: ${order.deliveryTerms}`],
         escrowNote: 'Your payment is held in escrow pending delivery confirmation or a reviewer decision on a dispute.',
       };
     },
     async searchAndAdvise(query: string, catalog: Product[]) {
-      const parsed = await ask('search', { query, catalog: catalog.map(p => ({ id: p.id, name: p.name, description: p.description.slice(0, 200), price: p.price, currency: p.currency })) }, 'Return {"answer": string (max 40 words), "recommendedProductIds": string[] (max 8)}. Only recommend IDs from this catalog. Never invent products or prices.');
+      const reply = await ask('search', { query, catalog: catalog.map(p => ({ id: p.id, name: p.name, description: p.description.slice(0, 200), price: p.price, currency: p.currency })) }, 'Return {"answer": string (max 40 words), "recommendedProductIds": string[] (max 8)}. Only recommend IDs from this catalog. Never invent products or prices.');
+      const parsed = reply?.value;
       if (isRecord(parsed) && nonempty(parsed.answer) && parsed.answer.length <= 500 && parsed.answer.trim().split(/\s+/).length <= 40 && strings(parsed.recommendedProductIds)) {
         const ids = new Set(catalog.map(p => p.id));
         const recommendedProductIds = [...new Set(parsed.recommendedProductIds)].filter(id => ids.has(id)).slice(0, 8);
-        if (recommendedProductIds.length || parsed.recommendedProductIds.length === 0) return { answer: parsed.answer, recommendedProductIds, suggestedFilters: [], source: 'ai' as const };
+        if (reply && (recommendedProductIds.length || parsed.recommendedProductIds.length === 0)) return { answer: parsed.answer, recommendedProductIds, suggestedFilters: [], source: 'ai' as const, modelVersion: reply.modelVersion };
       }
       const matched = keywordSearch(query, catalog);
       return { answer: matched.length ? `Found ${matched.length} matching product(s).` : 'No products matched your search.', recommendedProductIds: matched.map(p => p.id), suggestedFilters: [], source: 'keyword' as const };
     },
     async analyzeDisputeCase(dispute: Dispute, snapshot: PurchaseSnapshot | undefined, verifications: DeliveryVerification[], evidence: EvidenceItem[], order?: Order): Promise<Analysis> {
       const fallback = ruleAnalysis(dispute, snapshot, verifications, evidence, order);
-      const parsed = validateAnalysis(await ask('dispute', {
+      const reply = await ask('dispute', {
         reason: dispute.reason, details: dispute.details, claimedAmount: dispute.claimedAmount,
         snapshot: snapshot?.payload, deliveryVerifications: verifications, evidence,
         dispatch: order ? { dispatchedAt: order.dispatchedAt, dispatchContactId: order.dispatchContactId } : undefined,
-      }, 'Return {"findings": string[], "inconsistencies": string[], "recommendedOutcome": "BUYER_REFUNDED" | "SELLER_PAID" | "SPLIT" | "NEEDS_REVIEW", "confidence": number, "rationale": string, "infoRequests": [{"requestedFrom": "BUYER" | "SELLER", "question": string}]}. Max 10 findings, 10 inconsistencies, 4 questions. Use NEEDS_REVIEW with low confidence for missing or conflicting evidence. Delivery confirmation does not resolve quality or description complaints.'));
-      return parsed ? { ...parsed, source: 'ai', modelVersion: provider!.modelVersion } : fallback;
+      }, 'Return {"findings": string[], "inconsistencies": string[], "recommendedOutcome": "BUYER_REFUNDED" | "SELLER_PAID" | "SPLIT" | "NEEDS_REVIEW", "confidence": number, "rationale": string, "infoRequests": [{"requestedFrom": "BUYER" | "SELLER", "question": string}]}. Max 10 findings, 10 inconsistencies, 4 questions. Use NEEDS_REVIEW with low confidence for missing or conflicting evidence. Delivery confirmation does not resolve quality or description complaints.');
+      const parsed = validateAnalysis(reply?.value);
+      return reply && parsed ? { ...parsed, source: 'ai', modelVersion: reply.modelVersion } : fallback;
     },
   };
 }
-// Dots3 through OpenRouter with a server key; otherwise built-in rules.
-export const aiLayer = createAiLayer(configuredAIProvider());
+export function selectAIProvider(env: NodeJS.ProcessEnv = process.env) {
+  switch (env.AI_PROVIDER?.trim().toLowerCase()) {
+    case 'anthropic': {
+      const key = env.ANTHROPIC_API_KEY?.trim();
+      const model = env.ANTHROPIC_MODEL?.trim();
+      return key && model ? createAnthropicProvider(key, model) : undefined;
+    }
+    default:
+      return configuredAIProvider(env);
+  }
+}
+
+export const aiLayer = createAiLayer(selectAIProvider());

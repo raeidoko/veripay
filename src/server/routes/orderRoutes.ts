@@ -6,10 +6,11 @@ import { dispatchService } from '../services/dispatchService.ts';
 import { riskService } from '../services/riskService.ts';
 import { trustService } from '../services/trustService.ts';
 import { aiLayer } from '../services/aiLayer.ts';
+import { auditLogService } from '../services/auditLogService.ts';
 
 export const orderRoutes = express.Router();
   // F1 & F2: Order & Escrow Service
-  orderRoutes.get('/orders', (req, res) => {
+  orderRoutes.get('/orders', (_req, res) => {
     const user = res.locals.user;
     const orders = orderEscrowService.getOrdersForUser(user.id, user.role);
     res.json(orders);
@@ -50,7 +51,12 @@ export const orderRoutes = express.Router();
     if (order.state !== 'AWAITING_CONFIRMATION') return res.status(409).json({error:'This order is not awaiting confirmation'});
     const sellerProfile = trustService.getProfile(order.sellerId);
     const prompt = await aiLayer.generateConfirmationPrompt(order, sellerProfile.level);
-    order.confirmationText = `${prompt.headline}\n${prompt.summaryText}\n${prompt.keyCheckpoints.join('\n')}\n${prompt.escrowNote}`;
+    order.confirmationText = `${prompt.headline}\n${prompt.guidance}\n${prompt.summaryText}\n${prompt.keyCheckpoints.join('\n')}\n${prompt.escrowNote}`;
+    if (prompt.source === 'ai') auditLogService.log({
+      actorId: 'ai_engine', actorName: 'VeriPay AI', actorRole: 'AI_ENGINE',
+      action: 'AI_CONFIRMATION_GUIDANCE', entityType: 'ORDER', entityId: order.id,
+      changesSummary: `${prompt.modelVersion} generated the review guidance: ${prompt.guidance}`,
+    });
     res.json(prompt);
   }));
 

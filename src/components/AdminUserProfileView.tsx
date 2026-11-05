@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../client/api.ts';
 import type { AdminControlState, AdminUserProfile, Dispute, ProductReview, UserProfile, VerificationDocument } from '../shared/types.ts';
 import { DisputeDetailView } from './DisputeDetailView.tsx';
@@ -15,7 +15,7 @@ export function AdminUserProfileView({userId,admin,catalog,revision,onBack,onAct
   userId:string;admin:UserProfile;catalog:AdminControlState['products'];revision:number;
   onBack:()=>void;onAction:(action:AdminProfileAction)=>void;onChanged:()=>void;
 }) {
-  const [profile,setProfile]=useState<AdminUserProfile|null>(null);
+  const [profile,setProfile]=useState<(AdminUserProfile & { canResetPassword: boolean }) | null>(null);
   const [tab,setTab]=useState('Details');
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
@@ -56,6 +56,7 @@ export function AdminUserProfileView({userId,admin,catalog,revision,onBack,onAct
           ['Account ID',profile.user.id],['Role',profile.user.role],['Email',profile.user.email],['Phone',profile.user.phone],['Identity status',profile.user.identityVerified?'Verified / manually reviewed':'Not verified'],['Verification methods',profile.user.identityMethods.join(', ')||'None'],['Account restriction',profile.user.isRestricted?'Restricted':'No restriction flag'],['Restriction reason',profile.user.restrictionReason||'None']
         ].map(([name,value])=><div key={name}><dt className="text-slate-400">{name}</dt><dd className="mt-1 break-words font-medium text-slate-700">{value}</dd></div>)}</dl>
         {profile.user.approvalNotes&&<p className="text-xs text-slate-600">Admin notes: {profile.user.approvalNotes}</p>}
+        {profile.canResetPassword && <PasswordRecovery key={profile.user.id} userId={profile.user.id} />}
         {profile.user.role!=='admin'&&<div className="border-t border-slate-100 pt-3 flex flex-wrap gap-2">{['APPROVED','PENDING','SUSPENDED','REJECTED'].filter(status=>status!==profile.user.accountStatus).map(status=><button type="button" key={status} className={button} onClick={()=>decide(`users/${profile.user.id}/status`,`${status==='APPROVED'?'Approve':status==='PENDING'?'Request review for':status==='SUSPENDED'?'Suspend':'Reject'} ${profile.user.name}`,{status})}>{status==='APPROVED'?'Approve account':status==='PENDING'?'Request review':status==='SUSPENDED'?'Suspend account':'Reject account'}</button>)}</div>}
       </section>}
       {tab==='Documents'&&<div className="space-y-3">
@@ -88,6 +89,34 @@ export function AdminUserProfileView({userId,admin,catalog,revision,onBack,onAct
       {tab==='Disputes'&&<div className="space-y-3">{!profile.disputes.length&&<Empty text="There are no disputes linked to this user’s orders."/>}{profile.disputes.map(item=><article key={item.id} className={panel}><div className="flex flex-wrap justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">{item.id} · {item.reason.replaceAll('_',' ')}</h2><span className={badge}>{item.state.replaceAll('_',' ')}</span></div><p className="text-xs text-slate-500">Order {item.orderNumber} · Filed by {item.openerName} · {money(item.claimedAmount)}</p><p className="text-sm text-slate-600 whitespace-pre-wrap">{item.details}</p><button className={button} onClick={()=>setDispute(item)}>Open dispute & evidence</button></article>)}</div>}
       {tab==='Activity'&&<div className="space-y-3">{!profile.activity.length&&<Empty text="No recorded activity for this account yet."/>}{profile.activity.map(item=><article key={item.id} className={panel}><h2 className="text-xs font-bold text-slate-900">{item.action.replaceAll('_',' ')}</h2><p className="text-xs text-slate-500">{item.actorName} · {date(item.timestamp)}</p><p className="text-xs text-slate-700 break-words">{item.changesSummary}</p></article>)}</div>}
     </>}
+  </div>;
+}
+
+function PasswordRecovery({ userId }: { userId: string }) {
+  const [verified, setVerified] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [reset, setReset] = useState<Awaited<ReturnType<typeof api.issuePasswordReset>> | null>(null);
+
+  async function issue() {
+    setBusy(true);
+    setError('');
+    try {
+      setReset(await api.issuePasswordReset(userId));
+      setVerified(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not issue recovery code');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="space-y-2 border-t border-slate-100 pt-3 text-xs">
+    <h3 className="font-semibold">Password recovery</h3>
+    <label className="flex items-center gap-2"><input type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} /> I verified the account owner through a trusted channel.</label>
+    <button type="button" className={button} disabled={!verified || busy} onClick={issue}>Issue recovery code</button>
+    {reset && <p role="status" className="break-words">Share <code className="break-all">{reset.code}</code> privately with the verified owner. It expires in {reset.expiresInMinutes} minutes.</p>}
+    {error && <p role="alert" className="text-rose-700">{error}</p>}
   </div>;
 }
 function Empty({text}:{text:string}){return <p className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{text}</p>;}

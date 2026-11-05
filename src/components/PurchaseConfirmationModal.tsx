@@ -20,27 +20,35 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   const [confirming, setConfirming] = useState(false);
   const [aiPrompt, setAiPrompt] = useState<{
     headline: string;
+    guidance: string;
     summaryText: string;
     keyCheckpoints: string[];
     escrowNote: string;
   } | null>(null);
   const [buyerAgreed, setBuyerAgreed] = useState(false);
+  const [promptError, setPromptError] = useState('');
 
   useEffect(() => {
+    let current = true;
     if (isOpen && order) {
       setBuyerAgreed(false);
       setLoading(true);
+      setAiPrompt(null);
+      setPromptError('');
       api
         .getConfirmationPrompt(order.id)
         .then((prompt) => {
+          if (!current) return;
           setAiPrompt(prompt);
           setLoading(false);
         })
         .catch((err) => {
-          console.error(err);
+          if (!current) return;
+          setPromptError(err instanceof Error ? err.message : 'Could not load purchase details');
           setLoading(false);
         });
     }
+    return () => { current = false; };
   }, [isOpen, order]);
 
   if (!isOpen) return null;
@@ -49,7 +57,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
     if (!aiPrompt) return;
     setConfirming(true);
     try {
-      const fullConfirmationText = `${aiPrompt.headline}\n${aiPrompt.summaryText}\n${aiPrompt.keyCheckpoints.join('\n')}\n${aiPrompt.escrowNote}`;
+      const fullConfirmationText = `${aiPrompt.headline}\n${aiPrompt.guidance}\n${aiPrompt.summaryText}\n${aiPrompt.keyCheckpoints.join('\n')}\n${aiPrompt.escrowNote}`;
       const snapshot = await api.confirmPurchase(order.id, 'YES_CONFIRMED', fullConfirmationText);
       onConfirmed(snapshot);
     } catch (err) {
@@ -62,7 +70,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -87,15 +95,15 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto space-y-6">
+        <div className="min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-slate-600 font-medium">
-                AI Agent analyzing purchase specs, seller credentials and terms...
+                Preparing your purchase details…
               </p>
             </div>
-          ) : (
+          ) : promptError ? <p role="alert" className="text-sm text-rose-700">{promptError}. Close this window and try again.</p> : (
             <>
               {/* Primary AI Question */}
               <div className="bg-brand-50/70 border border-brand-100 rounded-lg p-5">
@@ -107,6 +115,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
                     <h4 className="text-base font-bold text-slate-900">
                       {aiPrompt?.headline || 'Is this what you really want to purchase?'}
                     </h4>
+                    <p className="mt-1 text-sm text-slate-700">{aiPrompt?.guidance}</p>
                     <p className="text-sm text-slate-700 mt-1 leading-relaxed">
                       {aiPrompt?.summaryText}
                     </p>

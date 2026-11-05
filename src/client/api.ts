@@ -45,8 +45,20 @@ export const api = {
     if (!response.ok) throw new Error(result.error || 'Could not create account');
     return result.user;
   },
-  async getAdminUserProfile(userId: string): Promise<AdminUserProfile> {
+  async getAdminUserProfile(userId: string): Promise<AdminUserProfile & { canResetPassword: boolean }> {
     return (await sessionFetch(`/api/admin/users/${encodeURIComponent(userId)}/profile`)).json();
+  },
+  async issuePasswordReset(userId: string): Promise<{ code: string; expiresInMinutes: number }> {
+    return (await sessionFetch(`/api/admin/users/${encodeURIComponent(userId)}/password-reset`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identityVerified: true }),
+    })).json();
+  },
+  async resetPassword(code: string, password: string): Promise<void> {
+    const response = await fetch('/api/auth/password-reset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, password }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not reset password');
   },
   async getAdminControl(): Promise<AdminControlState> { return (await sessionFetch('/api/admin/control')).json(); },
   async adminAction(path: string, data: unknown): Promise<void> {
@@ -77,7 +89,7 @@ export const api = {
     const response = await fetch(API_BASE + '/auth/logout', { method: 'POST', credentials: 'same-origin' });
     if (!response.ok) throw new Error('Could not sign out. Please try again.');
   },
-  async getDemoAccounts(): Promise<{accounts: {email: string; name: string; role: string}[]; demoPassword: string | null}> {
+  async getDemoAccounts(): Promise<{accounts: {email: string; name: string; role: string}[]; demoPassword: string | null; enabled?: boolean}> {
     const response = await fetch(API_BASE + '/auth/demo-accounts', {cache: 'no-store'});
     if (!response.ok) throw new Error('Could not load demo accounts');
     return response.json();
@@ -177,6 +189,7 @@ export const api = {
   },
 
   async getConfirmationPrompt(orderId: string): Promise<{
+    guidance: string;
     headline: string;
     summaryText: string;
     keyCheckpoints: string[];

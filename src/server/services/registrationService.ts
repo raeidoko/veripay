@@ -15,6 +15,14 @@ registerState('accounts', accounts);
 for (const account of accounts) if (!users.some(user => user.id === account.user.id)) users.push(account.user);
 
 export const registrationService = {
+  replacePassword(userId: string, password: string) {
+    const account = accounts.find(item => item.user.id === userId);
+    if (!account) return false;
+    const salt = randomBytes(16);
+    account.hash = scryptSync(password, salt, 64).toString('hex');
+    account.salt = salt.toString('hex');
+    return true;
+  },
   credential(userId: string) {
     const account = accounts.find(item => item.user.id === userId);
     return account ? { salt: Buffer.from(account.salt, 'hex'), hash: Buffer.from(account.hash, 'hex') } : null;

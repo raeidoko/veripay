@@ -135,7 +135,7 @@ export const orderEscrowService = {
   confirmOrderPurchase(
     orderId: string,
     buyerResponse: string,
-    confirmationPromptText: string
+    _confirmationPromptText: string
   ): { success: boolean; snapshot?: any; error?: string } {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return { success: false, error: 'Order not found' };

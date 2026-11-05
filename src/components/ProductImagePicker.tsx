@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { MAX_PRODUCT_IMAGE_BYTES, PRODUCT_IMAGE_TYPES } from '../shared/productImages.ts';
 
 export function ProductImagePicker({ file, onChange, disabled = false }: {
