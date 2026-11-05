@@ -92,8 +92,9 @@ owner before issuing a single-use recovery code. Automatic email delivery is not
 configured.
 Sessions are in memory, so restarting the server requires signing in again.
 
-The public home page introduces VeriPay with a product image card, a purchase
-walkthrough, and links to registration and sign-in. `/getting-started` explains
+The public home page introduces VeriPay with an app screenshot, feature and
+benefit descriptions, a purchase walkthrough, role guides and FAQs, plus links
+to registration and sign-in. `/getting-started` explains
 the buyer and seller flows in more detail.
 New accounts see the guide after registration, and the workspace links back to
 it. Returning users can open `/login`; new users can open `/register` directly.
