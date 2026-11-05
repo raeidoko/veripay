@@ -12,7 +12,7 @@ controlRoutes.get('/platform', (_req,res) => {
   const {announcement,purchasesPaused} = platformService.settings();
   res.json({announcement,purchasesPaused});
 });
-controlRoutes.get('/admin/control', (_req,res) => res.json(platformService.control()));
+controlRoutes.get('/admin/control', (_req,res) => res.json({ ...platformService.control(), recoveryRequests: authService.passwordRecoveryRequests() }));
 controlRoutes.post('/admin/users/:id/password-reset', (req, res) => {
   res.set('Cache-Control', 'no-store');
   authService.issuePasswordReset(req, res);

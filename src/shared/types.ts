@@ -380,6 +380,7 @@ export interface PlatformSettings {
 }
 
 export interface AdminControlState {
+  recoveryRequests?: { userId: string; requestedAt: string }[];
   users: UserProfile[];
   documents: VerificationDocument[];
   products: Product[];

@@ -107,11 +107,18 @@ test('registered users can change their password with a single-use administrator
   const { user } = await registration.json();
   cookies.set(user.id, registration.headers.get('set-cookie')!.split(';')[0]);
   const endpoint = `/admin/users/${user.id}/password-reset`;
+  const unknown = await request('/auth/password-recovery', undefined, { email: 'unregistered-recovery@example.com' });
+  const known = await request('/auth/password-recovery', undefined, { email });
+  assert.equal(known.status, 200);
+  assert.deepEqual(known, unknown);
+  const recoveryQueue = (await request('/admin/control', persona('admin').id)).data.recoveryRequests;
+  assert.ok(recoveryQueue.some((item: any) => item.userId === user.id));
   assert.equal((await request(endpoint, user.id, { identityVerified: true })).status, 403);
   assert.equal((await request(endpoint, persona('admin').id, {})).status, 400);
   const issued = await request(endpoint, persona('admin').id, { identityVerified: true });
   assert.equal(issued.status, 200);
   assert.equal(issued.data.expiresInMinutes, 15);
+  assert.ok(!(await request('/admin/control', persona('admin').id)).data.recoveryRequests.some((item: any) => item.userId === user.id));
   const input = { code: issued.data.code, password };
   assert.deepEqual(await request('/auth/password-reset', undefined, input), { status: 200, data: { success: true } });
   assert.equal((await request('/auth/password-reset', undefined, input)).status, 400);

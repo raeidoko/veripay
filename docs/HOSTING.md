@@ -29,10 +29,15 @@ any service's compute plan or storage allocation.
    Confirm `enabled: true` and sign in as buyer, seller, and reviewer (admin).
 3. Verify the exact purchase total and check the AI source and model version
    for the configured provider. Inspect internal dispute recommendations as a reviewer.
-4. For a registered test account, open its admin profile, verify its owner, and
-   issue a recovery code. Use **Forgot password?** to redeem it. Confirm the old
+4. For a registered test account, request recovery at `/forgot-password`. In
+   Admin Control, review the recovery request, verify the owner, and issue a
+   recovery code. Use **Forgot password?** to redeem it. Confirm the old
    password and prior session fail. Keep the recovery code out of screenshots.
 5. Check the login, checkout and role workspaces at 390px and inspect Render logs.
+6. Open `/getting-started`, switch between buyer and seller guides, and register
+   an account. Confirm its guide appears, continue to the workspace, then sign
+   out and back in with the same credentials. Recovery is administrator-assisted;
+   the app does not send reset emails.
 
 ## Persistence and restarts
 

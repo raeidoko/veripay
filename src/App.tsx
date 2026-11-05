@@ -36,6 +36,7 @@ import { BrandLogo } from './components/BrandLogo.tsx';
 import { AdminControlView } from './components/AdminControlView.tsx';
 import { VerificationView } from './components/VerificationView.tsx';
 import { WalletPanel } from './components/WalletPanel.tsx';
+import { GettingStartedView } from './components/GettingStartedView.tsx';
 
 export default function App() {
   // Navigation tabs
@@ -47,6 +48,7 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [platform, setPlatform] = useState({announcement:'',purchasesPaused:false});
   const personaIdRef = useRef<string | null>(null);
 
@@ -55,18 +57,20 @@ export default function App() {
   const canFileDispute = currentUser?.role === 'buyer' || currentUser?.role === 'seller';
   const canView = (tab: TabKey) => !!currentUser && workspace.tabs.some(item => item.id === tab);
 
-  const acceptSignedInUser = (user: UserProfile) => {
+  const acceptSignedInUser = (user: UserProfile, registered = false) => {
     invalidateSessionRequests();
     personaIdRef.current = user.id;
     setCurrentUser(user);
     setActiveTab(workspaces[user.role].home);
     setAuthMessage('');
+    setShowGettingStarted(registered);
   };
 
   const clearAccount = () => {
     invalidateSessionRequests();
     personaIdRef.current = null;
     setCurrentUser(null);
+    setShowGettingStarted(false);
     setOrders([]); setDisputes([]); setProducts([]); setCart([]);
     setSelectedProduct(null); setSelectedDispute(null);
     setSelectedOrderForSnapshot(null); setSelectedOrderForDispatch(null);
@@ -77,7 +81,7 @@ export default function App() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
-    try { await api.signOut(); clearAccount(); setAuthMessage(''); }
+    try { await api.signOut(); window.history.replaceState(null, '', '/login'); clearAccount(); setAuthMessage(''); }
     catch (error: unknown) { alert(error instanceof Error ? error.message : 'Could not sign out'); }
     finally { setSigningOut(false); }
   };
@@ -123,7 +127,7 @@ export default function App() {
     api.getSession().then(user => { if (!cancelled && user) acceptSignedInUser(user); })
       .catch(() => { if (!cancelled) setAuthMessage('VeriPay is temporarily unavailable. Please try again shortly.'); })
       .finally(() => { if (!cancelled) setAuthChecked(true); });
-    const expired = () => { clearAccount(); setAuthMessage('Your session has ended. Please sign in again.'); };
+    const expired = () => { window.history.replaceState(null, '', '/login'); clearAccount(); setAuthMessage('Your session has ended. Please sign in again with your existing account.'); };
     window.addEventListener('veripay:session-expired', expired);
     return () => { cancelled = true; window.removeEventListener('veripay:session-expired', expired); };
   }, []);
@@ -357,7 +361,8 @@ export default function App() {
   };
 
   if (!authChecked) return <div role="status" className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-500">Checking your session…</div>;
-  if (!currentUser) return <SignInPanel onSignedIn={acceptSignedInUser} message={authMessage} />;
+  if (window.location.pathname === '/getting-started' || showGettingStarted || (!currentUser && window.location.pathname === '/')) return <GettingStartedView role={currentUser?.role} onContinue={currentUser ? () => { if (window.location.pathname === '/getting-started') window.location.assign('/'); else setShowGettingStarted(false); } : undefined} />;
+  if (window.location.pathname === '/forgot-password' || !currentUser) return <SignInPanel onSignedIn={acceptSignedInUser} message={authMessage} />;
 
   return (
     <div className="min-h-screen brand-platform bg-slate-50 text-slate-900 flex flex-col">
@@ -436,6 +441,7 @@ export default function App() {
 
       {/* ---------------- 2. MAIN VIEW CONTAINER ---------------- */}
       <main key={currentUser?.id} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <a href="/getting-started" className="inline-block rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-bold text-brand-800">Getting started · How VeriPay works</a>
         {platform.announcement && <p className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">{platform.announcement}</p>}
         {platform.purchasesPaused && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-800">New purchases are temporarily paused. Existing orders and support remain available.</p>}
         {currentUser.role !== 'admin' && currentUser.accountStatus !== 'APPROVED' && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2"><p className="font-bold">{currentUser.accountStatus === 'PENDING' ? 'Your account review is in progress' : 'Your account needs attention'}</p><p>{currentUser.role === 'buyer' ? 'You can browse the shop, ask the shopping assistant, and view your purchases and disputes during review.' : 'You can view your storefront, sales and disputes during review.'} Trading requires approval.</p><div className="flex flex-wrap gap-3"><button className="font-bold underline" onClick={()=>setActiveTab('orders')}>View {currentUser.role === 'buyer' ? 'My Purchases' : 'Sales & Dispatch'}</button><button className="font-bold underline" onClick={()=>setActiveTab('disputes')}>View My Disputes</button><button className="font-bold underline" onClick={()=>setActiveTab('verification')}>View verification status</button></div></div>}

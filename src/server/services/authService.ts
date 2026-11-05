@@ -34,8 +34,32 @@ const registrations = new Map<string,{count:number;until:number}>();
 const resetAttempts = new Map<string, { count: number; until: number }>();
 const resetCodes = registerState('passwordResetCodes', {} as Record<string, { hash: string; expiresAt: number }>);
 const resetLifetimeMs = 15 * 60 * 1000;
+const recoveryRequests = registerState('passwordRecoveryRequests', {} as Record<string, string>);
+const recoveryAttempts = new Map<string, { count: number; until: number }>();
 
 export const authService = {
+  requestPasswordRecovery(req: Request, res: Response) {
+    const now = Date.now();
+    for (const [key, value] of recoveryAttempts) if (value.until <= now) recoveryAttempts.delete(key);
+    const key = req.ip || 'local';
+    const attempt = recoveryAttempts.get(key);
+    if (attempt && attempt.count >= 10) {
+      res.set('Retry-After', String(Math.ceil((attempt.until - now) / 1000)));
+      return res.status(429).json({ error: 'Too many recovery requests. Try again later.' });
+    }
+    recoveryAttempts.set(key, { count: (attempt?.count || 0) + 1, until: attempt?.until || now + resetLifetimeMs });
+    for (const [id, timestamp] of Object.entries(recoveryRequests)) if (Date.parse(timestamp) < now - 7 * 24 * 60 * 60 * 1000) delete recoveryRequests[id];
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const user = users.find(item => item.email.toLowerCase() === email);
+    if (user && user.role !== 'admin' && registrationService.credential(user.id) && !recoveryRequests[user.id]) {
+      recoveryRequests[user.id] = new Date(now).toISOString();
+      auditLogService.log({ actorId: user.id, actorName: 'Account recovery request', actorRole: 'SYSTEM', action: 'PASSWORD_RECOVERY_REQUESTED', entityType: 'USER', entityId: user.id, changesSummary: 'Recovery assistance requested. Administrator identity verification is required before issuing a code.' });
+    }
+    return res.json({ message: 'If this email belongs to an eligible account, your request is queued for VeriPay support. An administrator must verify your identity before sharing a recovery code. This demo does not send automated reset emails.' });
+  },
+  passwordRecoveryRequests() {
+    return Object.entries(recoveryRequests).map(([userId, requestedAt]) => ({ userId, requestedAt }));
+  },
   issuePasswordReset(req: Request, res: Response) {
     const admin = res.locals.user;
     if (admin?.role !== 'admin') return res.status(403).json({ error: 'Administrator access required' });
@@ -52,6 +76,7 @@ export const authService = {
     }
     const code = randomBytes(16).toString('hex');
     resetCodes[user.id] = { hash: digest(code), expiresAt: now + resetLifetimeMs };
+    delete recoveryRequests[user.id];
     auditLogService.log({ actorId: admin.id, actorName: admin.name, actorRole: 'admin', action: 'PASSWORD_RESET_ISSUED', entityType: 'USER', entityId: user.id, changesSummary: 'Administrator confirmed identity verification and issued a single-use recovery code.' });
     return res.json({ code, expiresInMinutes: 15 });
   },

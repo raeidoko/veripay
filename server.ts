@@ -42,6 +42,7 @@ async function startServer() {
   app.get('/api/auth/demo-accounts', (_req, res) => { res.set('Cache-Control', 'no-store').json(authService.demoAccounts()); });
   app.post('/api/auth/login', (req, res) => { res.set('Cache-Control', 'no-store'); authService.login(req, res); });
   app.post('/api/auth/password-reset', (req, res) => { res.set('Cache-Control', 'no-store'); authService.resetPassword(req, res); });
+  app.post('/api/auth/password-recovery', (req, res) => { res.set('Cache-Control', 'no-store'); authService.requestPasswordRecovery(req, res); });
   app.post('/api/auth/register', (req, res) => { res.set('Cache-Control','no-store'); authService.register(req,res); });
   app.get('/api/auth/me', (req, res) => {
     res.set('Cache-Control', 'no-store');

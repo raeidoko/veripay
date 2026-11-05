@@ -86,9 +86,15 @@ also lets pending users view their orders, disputes, and verification status.
 Admin registration is not available. Accounts and salted password hashes use
 PostgreSQL when DATABASE_URL is configured, with local SQLite as the development
 default. The demo password override does not affect registered users. Forgot
-password supports single-use administrator-issued recovery codes after identity
-checks. Automatic email delivery is not configured.
+password has a dedicated `/forgot-password` page. Users request assistance with
+their email; administrators see the requests in Admin Control and verify the
+owner before issuing a single-use recovery code. Automatic email delivery is not
+configured.
 Sessions are in memory, so restarting the server requires signing in again.
+
+The public home page and `/getting-started` explain the buyer and seller flows.
+New accounts see the guide after registration, and the workspace links back to
+it. Returning users can open `/login`; new users can open `/register` directly.
 
 Buyers can add a 1–5 star rating and comment before or after purchasing, and update
 their own review. Each buyer has one review per product. Catalog averages and counts

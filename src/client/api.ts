@@ -60,6 +60,14 @@ export const api = {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not reset password');
   },
+  async requestPasswordRecovery(email: string): Promise<string> {
+    const response = await fetch('/api/auth/password-recovery', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not request recovery assistance');
+    return result.message;
+  },
   async getAdminControl(): Promise<AdminControlState> { return (await sessionFetch('/api/admin/control')).json(); },
   async adminAction(path: string, data: unknown): Promise<void> {
     await sessionFetch('/api/admin/' + path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});

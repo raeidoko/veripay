@@ -4,13 +4,13 @@ import type { UserProfile } from '../shared/types.ts';
 import { api } from '../client/api.ts';
 import { BrandLogo } from './BrandLogo.tsx';
 
-export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserProfile) => void; message?: string }) {
+export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserProfile, registered?: boolean) => void; message?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [recovering, setRecovering] = useState(false);
+  const [recovering, setRecovering] = useState(window.location.pathname === '/forgot-password');
   const [notice, setNotice] = useState('');
-  const [registering,setRegistering] = useState(false);
+  const [registering,setRegistering] = useState(window.location.pathname === '/register');
   const [role,setRole] = useState<'buyer'|'seller'|''>('');
   const [name,setName] = useState('');
   const [phone,setPhone] = useState('');
@@ -26,17 +26,23 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
     if(registering && password!==confirmPassword) {setError('Passwords do not match');return;}
     setBusy(true);
     setError('');
-    try { onSignedIn(registering && role ? await api.registerAccount({name,email,phone,password,role}) : await api.signIn(email, password)); }
+    try {
+      const user = registering && role ? await api.registerAccount({name,email,phone,password,role}) : await api.signIn(email, password);
+      window.history.replaceState(null, '', '/');
+      onSignedIn(user, registering);
+    }
     catch (err: unknown) { setError(err instanceof Error ? err.message : 'Could not sign in'); }
     finally { setBusy(false); }
   }
 
   function changeMode(value:boolean) {
+    window.history.replaceState(null, '', value ? '/register' : '/login');
     setRegistering(value);setRole('');setError('');setPassword('');setConfirmPassword('');
     setShowPassword(false);setNotice('');
   }
 
   if (recovering) return <ResetPasswordPanel onBack={changed => {
+    window.history.replaceState(null, '', '/login');
     setRecovering(false);
     if (changed) setNotice('Password updated. Sign in with your new password.');
   }} />;
@@ -95,10 +101,6 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
                 {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
               </button>
             </div>
-            {!registering && <button type="button" disabled={busy} className="mt-2 text-xs font-semibold text-brand-700 hover:underline" onClick={() => {
-              changeMode(false);
-              setRecovering(true);
-            }}>Forgot password?</button>}
             {registering&&<p className="mt-1 text-[11px] text-slate-500">Use at least 10 characters.</p>}
           </div>
           {registering&&<div>
@@ -110,6 +112,8 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
             {busy ? registering?'Creating account…':'Signing in…' : registering?'Create account':'Sign in'} <ArrowRight className="h-4 w-4" />
           </button>
         </form>
+        {!registering && <a href="/forgot-password" className="mt-4 block rounded-lg bg-brand-50 px-4 py-3 text-center text-sm font-bold text-brand-800 underline">Forgot password?</a>}
+        <a href="/getting-started" className="mt-4 block text-center text-sm font-semibold text-brand-700 underline">New to VeriPay? See how it works</a>
         {registering ? <button type="button" disabled={busy} onClick={()=>changeMode(false)} className="mt-4 w-full text-xs font-semibold text-brand-600 hover:underline">Already have an account? Sign in</button> : <button type="button" disabled={busy} onClick={()=>changeMode(true)} className="mt-4 w-full rounded-lg border border-brand-600 px-4 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50 disabled:opacity-50">Register on VeriPay</button>}
         {!registering && demo && <details className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500">
           <summary className="cursor-pointer font-semibold text-slate-600">Demo accounts</summary>
@@ -126,12 +130,22 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
 }
 
 function ResetPasswordPanel({ onBack }: { onBack: (changed: boolean) => void }) {
+  const [email, setEmail] = useState('');
+  const [requestNotice, setRequestNotice] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const field = 'block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm';
+
+  async function requestCode(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true); setError(''); setRequestNotice('');
+    try { setRequestNotice(await api.requestPasswordRecovery(email)); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not request help'); }
+    finally { setBusy(false); }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -152,7 +166,13 @@ function ResetPasswordPanel({ onBack }: { onBack: (changed: boolean) => void }) 
     <section className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
       <BrandLogo size="signin" />
       <h1 className="text-xl font-bold">Reset your password</h1>
-      <p className="text-sm text-slate-600">Ask your VeriPay administrator to verify your identity and send you a recovery code. For demo accounts, ask the demo host for the current credentials.</p>
+      <p className="text-sm text-slate-600">Enter your account email to request recovery help. VeriPay support verifies your identity and shares a single-use code. For demo accounts, ask the demo host for the current credentials.</p>
+      <form onSubmit={requestCode} className="space-y-3 border-b border-slate-200 pb-5">
+        <label className="block text-sm font-medium">Account email<input className={field} type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" maxLength={254} required /></label>
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-700 p-3 text-sm font-bold text-white disabled:opacity-50">Request recovery help</button>
+        {requestNotice && <p role="status" className="text-sm text-brand-800">{requestNotice}</p>}
+      </form>
+      <h2 className="font-bold text-slate-900">Already have a recovery code?</h2>
       <form onSubmit={submit} className="space-y-4">
         <label className="block text-sm font-medium">Recovery code<input className={field} value={code} onChange={event => setCode(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} required /></label>
         <label className="block text-sm font-medium">New password<input className={field} type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" minLength={10} maxLength={128} required /></label>
