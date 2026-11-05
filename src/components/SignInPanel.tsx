@@ -130,6 +130,7 @@ export function SignInPanel({ onSignedIn, message }: { onSignedIn: (user: UserPr
 }
 
 function ResetPasswordPanel({ onBack }: { onBack: (changed: boolean) => void }) {
+  const [step, setStep] = useState<'request' | 'reset'>('request');
   const [email, setEmail] = useState('');
   const [requestNotice, setRequestNotice] = useState('');
   const [code, setCode] = useState('');
@@ -142,7 +143,10 @@ function ResetPasswordPanel({ onBack }: { onBack: (changed: boolean) => void }) 
   async function requestCode(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true); setError(''); setRequestNotice('');
-    try { setRequestNotice(await api.requestPasswordRecovery(email)); }
+    try {
+      setRequestNotice(await api.requestPasswordRecovery(email));
+      setStep('reset');
+    }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not request help'); }
     finally { setBusy(false); }
   }
@@ -165,21 +169,27 @@ function ResetPasswordPanel({ onBack }: { onBack: (changed: boolean) => void }) 
   return <main className="grid min-h-screen place-items-center bg-slate-50 p-4">
     <section className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
       <BrandLogo size="signin" />
-      <h1 className="text-xl font-bold">Reset your password</h1>
+      <p className="text-xs font-bold text-brand-700">Step {step === 'request' ? '1' : '2'} of 2</p>
+      <h1 className="text-xl font-bold">{step === 'request' ? 'Reset your password' : 'Set your new password'}</h1>
+      {step === 'request' ? <>
       <p className="text-sm text-slate-600">Enter your account email to request recovery help. VeriPay support verifies your identity and shares a single-use code. For demo accounts, ask the demo host for the current credentials.</p>
-      <form onSubmit={requestCode} className="space-y-3 border-b border-slate-200 pb-5">
+      <form onSubmit={requestCode} className="space-y-3">
         <label className="block text-sm font-medium">Account email<input className={field} type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" maxLength={254} required /></label>
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-700 p-3 text-sm font-bold text-white disabled:opacity-50">Request recovery help</button>
-        {requestNotice && <p role="status" className="text-sm text-brand-800">{requestNotice}</p>}
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-700 p-3 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Requesting…' : 'Request recovery help'}</button>
       </form>
-      <h2 className="font-bold text-slate-900">Already have a recovery code?</h2>
+      <button type="button" disabled={busy} onClick={() => { setError(''); setStep('reset'); }} className="block text-sm font-semibold text-brand-700 underline">Already have a recovery code?</button>
+      </> : <>
+      {requestNotice && <p role="status" className="rounded-lg bg-brand-50 p-3 text-sm text-brand-800">{requestNotice}</p>}
+      <p className="text-sm text-slate-600">Once an administrator verifies your identity and shares your recovery code, enter it below with your new password.</p>
       <form onSubmit={submit} className="space-y-4">
         <label className="block text-sm font-medium">Recovery code<input className={field} value={code} onChange={event => setCode(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} required /></label>
         <label className="block text-sm font-medium">New password<input className={field} type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" minLength={10} maxLength={128} required /></label>
         <label className="block text-sm font-medium">Confirm new password<input className={field} type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" minLength={10} maxLength={128} required /></label>
-        {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
         <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-600 p-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Updating…' : 'Set new password'}</button>
       </form>
+      <button type="button" disabled={busy} onClick={() => { setError(''); setCode(''); setPassword(''); setConfirmation(''); setStep('request'); }} className="block text-sm font-semibold text-brand-700 underline">Back to recovery request</button>
+      </>}
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
       <button type="button" disabled={busy} onClick={() => onBack(false)} className="text-sm font-semibold text-brand-700 hover:underline">Back to sign in</button>
     </section>
   </main>;
